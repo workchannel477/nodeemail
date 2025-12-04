@@ -1,1 +1,49 @@
-# nodeemail
+# Email Management Stack (Node.js API + Alpine.js UI)
+
+Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compatible if Node is enabled, also deployable to Vercel/Netlify functions) and a static Alpine.js + Tailwind dashboard. Email dispatch uses AWS SES by default, with optional SMTP + proxy support. Data lives in JSON files under `data/`.
+
+## Architecture
+- **Backend**: Node.js/Express (`api/server.js`) with routes for auth, users/admin, jobs, rate limits, and IP rotation. Email sending uses AWS SES SDK; optional `MAIL_TRANSPORT=smtp` will use SMTP via Nodemailer (supports proxy and IP rotation list).
+- **Frontend**: Static Alpine.js + Tailwind pages in `public/`; `public/config.js` sets the API base (defaults to `/api` on the same domain).
+- **Data**: JSON stores (`data/auth.json`, `data/email-jobs.json`, `data/ip-rotation.json`, `data/rate-limit.json`).
+
+## Repo layout
+- `api/server.js` — Express API entry.
+- `public/` — static UI; upload as-is to your web root (or `dist/` after `npm run build`).
+- `public/config.js` — set `window.APP_CONFIG.apiBase` if your API runs elsewhere.
+- `data/` — JSON storage (auto-created/defaulted).
+- `scripts/build.js` — copies `public/` to `dist/` for upload.
+
+## Local quick start (Node)
+1) Install Node 18+.  
+2) `npm install`  
+3) Backend: `npm run api` (defaults to http://localhost:5000).  
+4) Frontend: `npm run dev` (serves http://localhost:8080, pointing to `/api` by default).
+
+## Deploy
+- **cPanel (Node app)**: ensure Node support is enabled on your plan. Upload code, run `npm install`, and point the app to `api/server.js` (e.g., via Passenger/Setup Node App). Set env vars in cPanel.
+- **Vercel/Netlify** (UI): build and deploy `dist/` (see `netlify.toml` for defaults). Set `API_BASE_OVERRIDE` env to your API URL.
+- **VPS/Managed Node (recommended for API)**: Render/Fly/DigitalOcean App Platform. Use the included `Dockerfile` or `Procfile`. Persist `data/`.
+- **Static hosts**: use `npm run build` and upload `dist/` for the UI; point it to your API via `public/config.js` or `API_BASE_OVERRIDE`.
+
+## Configuration (.env)
+- `SECRET_KEY`, `SESSION_TIMEOUT`
+- Rate limits: `MAX_EMAILS_PER_MINUTE`, `MAX_REQUESTS_PER_MINUTE`, `EMAIL_BATCH_SIZE`
+- SMTP defaults: `DEFAULT_SMTP_HOST`, `DEFAULT_SMTP_PORT`
+- CORS: `CORS_ORIGINS`
+- SES: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_FROM`, `MAIL_TRANSPORT=ses|smtp`
+
+## IP rotation & proxies
+- Proxies are loaded from `data/ip-rotation.json` and rotated per batch.  
+- For SES, a proxy is used only for the HTTPS client; SES still sends from AWS IPs.  
+- For SMTP (`MAIL_TRANSPORT=smtp`), a `proxy` or SOCKS proxy is passed to Nodemailer.
+
+## Deliverability notes
+- SES (or reputable SMTP) gives the best inbox placement; verify sender domains and set SPF/DKIM/DMARC.  
+- Chunking and rate limits are enforced; adjust `EMAIL_BATCH_SIZE` and per-minute caps to avoid provider throttling.  
+- Shared hosting (cPanel) may throttle outbound SMTP or background processes—Vercel/Netlify or a small VPS (Fly.io/Render/DigitalOcean) is typically more reliable for sustained email jobs.
+
+## Default admin
+- Auto-created if `data/auth.json` is empty:  
+  - Username: `admin`  
+  - Password: `admin123` (change immediately via admin panel or `/admin/users/{id}/change-password`).

@@ -1,0 +1,33 @@
+{
+  "name": "email-dashboard",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Alpine.js dashboard with Node.js/Express backend and AWS SES mailer.",
+  "type": "module",
+  "scripts": {
+    "dev": "serve public -l 8080",
+    "build": "node scripts/build.js",
+    "clean": "node scripts/clean.js",
+    "api": "node api/server.js",
+    "api:dev": "nodemon api/server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.695.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "fs-extra": "^11.2.0",
+    "@aws-sdk/node-http-handler": "^3.369.0",
+    "https-proxy-agent": "^7.0.5",
+    "nodemailer": "^6.9.15",
+    "socks-proxy-agent": "^8.0.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
