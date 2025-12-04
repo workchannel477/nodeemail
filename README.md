@@ -17,10 +17,11 @@ Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compat
 ## Local quick start (Node)
 1) Install Node 18+.  
 2) `npm install`  
-3) Backend: `npm run api` (defaults to http://localhost:5000).  
-4) Frontend: `npm run dev` (serves http://localhost:8080, pointing to `/api` by default).
+3) Backend/API + static UI: `npm start` (same as `npm run api`, serves API + static files).  
+4) Frontend dev server: `npm run dev` (serves http://localhost:8080, calls the API at http://localhost:5000 by default).
 
 ## Deploy
+- **Render (single service)**: create a Web Service, set Build Command to `npm run build`, Start Command to `npm start`, and add a persistent disk mounted at `/app/data` so the JSON stores survive restarts. Optionally set `API_BASE`/`API_BASE_OVERRIDE` to force a specific API base URL (default is same-origin).  
 - **cPanel (Node app)**: ensure Node support is enabled on your plan. Upload code, run `npm install`, and point the app to `api/server.js` (e.g., via Passenger/Setup Node App). Set env vars in cPanel.
 - **Vercel/Netlify** (UI): build and deploy `dist/` (see `netlify.toml` for defaults). Set `API_BASE_OVERRIDE` env to your API URL.
 - **VPS/Managed Node (recommended for API)**: Render/Fly/DigitalOcean App Platform. Use the included `Dockerfile` or `Procfile`. Persist `data/`.
@@ -31,6 +32,7 @@ Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compat
 - Rate limits: `MAX_EMAILS_PER_MINUTE`, `MAX_REQUESTS_PER_MINUTE`, `EMAIL_BATCH_SIZE`
 - SMTP defaults: `DEFAULT_SMTP_HOST`, `DEFAULT_SMTP_PORT`
 - CORS: `CORS_ORIGINS`
+- Frontend base: `API_BASE` or `API_BASE_OVERRIDE` (optional; defaults to same-origin, `http://localhost:5000` in dev)
 - SES: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_FROM`, `MAIL_TRANSPORT=ses|smtp`
 
 ## IP rotation & proxies

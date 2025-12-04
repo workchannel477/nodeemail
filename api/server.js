@@ -19,6 +19,9 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, "..");
 const dataDir = path.join(rootDir, "data");
 const logDir = path.join(rootDir, "logs");
+const staticDir = fs.existsSync(path.join(rootDir, "dist"))
+  ? path.join(rootDir, "dist")
+  : path.join(rootDir, "public");
 
 const authFilePath = path.join(dataDir, "auth.json");
 const jobsFilePath = path.join(dataDir, "email-jobs.json");
@@ -603,8 +606,8 @@ async function addMailbox(username, smtpUsername, smtpPassword) {
 }
 
 // ---------- Static ----------
-app.use(express.static(path.join(rootDir, "public")));
+app.use(express.static(staticDir));
 
 app.listen(PORT, () => {
-  console.log(`API running on http://localhost:${PORT}`);
+  console.log(`API running on http://localhost:${PORT} (serving static from ${staticDir})`);
 });
