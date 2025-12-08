@@ -11,9 +11,11 @@ document.addEventListener('alpine:init', () => {
     ipRotation: { proxies: [], currentIndex: 0 },
     rateLimits: { limits: {} },
     stats: {},
+    smtpPool: { servers: [], rotateAfter: 200, sentSinceRotation: 0, currentIndex: 0 },
     loginForm: { username: '', password: '' },
     passwordForm: { newPassword: '' },
     ipForm: { proxies: '' },
+    smtpForm: { label: '', from: '', host: '', port: 587, username: '', password: '' },
     newUser: { username: '', password: '', role: 'user', status: 'active' },
     editUserForm: { id: '', username: '', role: '', status: '' },
     selectedUser: null,
@@ -44,6 +46,7 @@ document.addEventListener('alpine:init', () => {
         await this.fetchOverview();
         await this.loadIPRotation();
         await this.loadRateLimits();
+        await this.loadSmtpPool();
       }
     },
     
@@ -80,6 +83,7 @@ document.addEventListener('alpine:init', () => {
         await this.fetchOverview();
         await this.loadIPRotation();
         await this.loadRateLimits();
+        await this.loadSmtpPool();
         
         this.message = 'Login successful!';
         setTimeout(() => this.message = '', 3000);
@@ -99,6 +103,7 @@ document.addEventListener('alpine:init', () => {
       this.token = '';
       this.user = null;
       this.overview = { users: [], jobs: [], ipRotation: { proxies: [], currentIndex: 0 }, rateLimits: { limits: {} }, stats: {} };
+      this.smtpPool = { servers: [], rotateAfter: 200, sentSinceRotation: 0, currentIndex: 0 };
       localStorage.removeItem('mailer_token');
       localStorage.removeItem('mailer_user');
     },
@@ -113,6 +118,7 @@ document.addEventListener('alpine:init', () => {
         const data = await response.json();
         this.overview = data;
         this.stats = data.stats;
+        if (data.smtpPool) this.smtpPool = data.smtpPool;
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -142,6 +148,84 @@ document.addEventListener('alpine:init', () => {
         }
       } catch (error) {
         console.error('Failed to load rate limits:', error);
+      }
+    },
+    
+    async loadSmtpPool() {
+      try {
+        const response = await apiFetch('/admin/smtp', { headers: this.headers() });
+        if (response.ok) {
+          const data = await response.json();
+          this.smtpPool = data;
+        }
+      } catch (error) {
+        console.error('Failed to load SMTP pool:', error);
+      }
+    },
+    
+    async addSmtp() {
+      this.error = '';
+      this.busy = true;
+      try {
+        const response = await apiFetch('/admin/smtp', {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify(this.smtpForm)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to add SMTP');
+        }
+        
+        const data = await response.json();
+        this.message = data.message;
+        this.smtpForm = { label: '', from: '', host: '', port: 587, username: '', password: '' };
+        await this.loadSmtpPool();
+      } catch (error) {
+        this.error = error.message;
+      } finally {
+        this.busy = false;
+      }
+    },
+    
+    async deleteSmtp(id) {
+      if (!confirm('Remove this SMTP server from the rotation?')) return;
+      try {
+        const response = await apiFetch(`/admin/smtp/${id}`, {
+          method: 'DELETE',
+          headers: this.headers()
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to delete SMTP server');
+        }
+        const data = await response.json();
+        this.message = data.message;
+        setTimeout(() => (this.message = ''), 3000);
+        await this.loadSmtpPool();
+      } catch (error) {
+        this.error = error.message;
+      }
+    },
+    
+    async updateSmtpRotation() {
+      try {
+        const response = await apiFetch('/admin/smtp/rotation', {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({ rotateAfter: this.smtpPool.rotateAfter })
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to update rotation');
+        }
+        const data = await response.json();
+        this.message = data.message;
+        setTimeout(() => (this.message = ''), 3000);
+        await this.loadSmtpPool();
+      } catch (error) {
+        this.error = error.message;
       }
     },
     
@@ -388,6 +472,26 @@ document.addEventListener('alpine:init', () => {
       }
     },
     
+    async clearRecipientLog(jobId) {
+      if (!confirm('Clear the stored recipient list for this job?')) return;
+      try {
+        const response = await apiFetch(`/admin/jobs/${jobId}/recipients`, {
+          method: 'DELETE',
+          headers: this.headers()
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to clear recipients');
+        }
+        const data = await response.json();
+        this.message = data.message;
+        setTimeout(() => (this.message = ''), 3000);
+        await this.fetchOverview();
+      } catch (error) {
+        this.error = error.message;
+      }
+    },
+    
     formatDate(value) {
       if (!value) return '-';
       try {
@@ -417,12 +521,12 @@ document.addEventListener('alpine:init', () => {
     error: '',
     loginForm: { username: '', password: '' },
     form: {
+      fromName: '',
+      replyTo: '',
       subject: '',
       recipients: '',
       textBody: '',
-      htmlBody: '',
-      smtpUsername: '',
-      smtpPassword: ''
+      htmlBody: ''
     },
     
     // Computed
@@ -534,8 +638,8 @@ document.addEventListener('alpine:init', () => {
       this.message = '';
       
       // Validate required fields
-      if (!this.form.subject || !this.form.recipients || !this.form.smtpUsername || !this.form.smtpPassword) {
-        this.error = 'All required fields must be filled.';
+      if (!this.form.fromName || !this.form.subject || !this.form.recipients) {
+        this.error = 'From name, subject, and recipients are required.';
         return;
       }
       

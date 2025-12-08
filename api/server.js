@@ -27,6 +27,7 @@ const authFilePath = path.join(dataDir, "auth.json");
 const jobsFilePath = path.join(dataDir, "email-jobs.json");
 const ipRotationFilePath = path.join(dataDir, "ip-rotation.json");
 const rateLimitFilePath = path.join(dataDir, "rate-limit.json");
+const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_MINUTE = parseInt(process.env.MAX_REQUESTS_PER_MINUTE || "60", 10);
 const EMAIL_RATE_LIMIT = parseInt(process.env.MAX_EMAILS_PER_MINUTE || "10", 10);
 const BATCH_SIZE_DEFAULT = parseInt(process.env.EMAIL_BATCH_SIZE || "50", 10);
+const SMTP_ROTATE_AFTER_DEFAULT = 200;
 
 const sessions = new Map();
 const apiRate = new Map();
@@ -90,6 +92,15 @@ async function ensureDataFiles() {
   }
   if (!(await fs.pathExists(rateLimitFilePath))) {
     await fs.writeJson(rateLimitFilePath, { limits: {} });
+  }
+  if (!(await fs.pathExists(smtpPoolFilePath))) {
+    await fs.writeJson(smtpPoolFilePath, {
+      servers: [],
+      currentIndex: 0,
+      sentSinceRotation: 0,
+      rotateAfter: SMTP_ROTATE_AFTER_DEFAULT,
+      updatedAt: new Date().toISOString(),
+    });
   }
 }
 
@@ -159,6 +170,101 @@ async function checkEmailRateLimit(username) {
   payload.limits[username] = entries;
   await writeJson(rateLimitFilePath, payload);
   return true;
+}
+
+function sanitizeSmtp(server) {
+  if (!server) return server;
+  const { password, ...rest } = server;
+  return rest;
+}
+
+function normalizeRotateAfter(value) {
+  const parsed = parseInt(value || SMTP_ROTATE_AFTER_DEFAULT, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : SMTP_ROTATE_AFTER_DEFAULT;
+}
+
+async function loadSmtpPool() {
+  const payload = await readJson(smtpPoolFilePath, {
+    servers: [],
+    currentIndex: 0,
+    sentSinceRotation: 0,
+    rotateAfter: SMTP_ROTATE_AFTER_DEFAULT,
+  });
+  payload.servers = payload.servers || [];
+  payload.currentIndex = parseInt(payload.currentIndex || "0", 10);
+  payload.sentSinceRotation = Number(payload.sentSinceRotation) || 0;
+  payload.rotateAfter = normalizeRotateAfter(payload.rotateAfter);
+  if (payload.currentIndex >= payload.servers.length && payload.servers.length) {
+    payload.currentIndex = 0;
+    payload.sentSinceRotation = 0;
+  }
+  return payload;
+}
+
+async function saveSmtpPool(payload) {
+  const normalizedServers = (payload.servers || []).map((server) => ({
+    ...server,
+    port: parseInt(server.port || "587", 10),
+  }));
+  const currentIndex = parseInt(payload.currentIndex || "0", 10);
+  const normalized = {
+    servers: normalizedServers,
+    currentIndex,
+    sentSinceRotation: Number(payload.sentSinceRotation) || 0,
+    rotateAfter: normalizeRotateAfter(payload.rotateAfter),
+    updatedAt: new Date().toISOString(),
+  };
+  if (normalized.currentIndex >= normalized.servers.length && normalized.servers.length) {
+    normalized.currentIndex = 0;
+    normalized.sentSinceRotation = 0;
+  }
+  await writeJson(smtpPoolFilePath, normalized);
+  return normalized;
+}
+
+async function pickSmtpServer() {
+  const pool = await loadSmtpPool();
+  if (!pool.servers.length) {
+    throw new Error("No SMTP servers configured. Ask an admin to add at least one SMTP account.");
+  }
+  const rotateAfter = normalizeRotateAfter(pool.rotateAfter);
+  let mutated = false;
+  if (pool.currentIndex >= pool.servers.length) {
+    pool.currentIndex = 0;
+    pool.sentSinceRotation = 0;
+    mutated = true;
+  }
+  while (pool.servers.length && pool.sentSinceRotation >= rotateAfter) {
+    pool.sentSinceRotation -= rotateAfter;
+    pool.currentIndex = (pool.currentIndex + 1) % pool.servers.length;
+    mutated = true;
+  }
+  if (mutated) {
+    await saveSmtpPool(pool);
+  }
+  const server = { ...pool.servers[pool.currentIndex], __fromPool: true };
+  return server;
+}
+
+async function recordSmtpUsage(sentCount = 0) {
+  if (!sentCount) return;
+  const pool = await loadSmtpPool();
+  if (!pool.servers.length) return;
+  pool.sentSinceRotation += sentCount;
+  const rotateAfter = normalizeRotateAfter(pool.rotateAfter);
+  while (pool.sentSinceRotation >= rotateAfter && pool.servers.length) {
+    pool.sentSinceRotation -= rotateAfter;
+    pool.currentIndex = (pool.currentIndex + 1) % pool.servers.length;
+  }
+  await saveSmtpPool(pool);
+}
+
+function formatFromAddress(name, email) {
+  if (!email) return name || "";
+  if (name) {
+    return `${name} <${email}>`;
+  }
+  return email;
 }
 
 function requireAuth(req, res, next) {
@@ -321,6 +427,83 @@ app.post("/admin/users/:id/change-password", requireAuth, requireAdmin, async (r
   res.json({ message: "Password updated successfully" });
 });
 
+// ---------- Admin SMTP pool ----------
+app.get("/admin/smtp", requireAuth, requireAdmin, async (_req, res) => {
+  const pool = await loadSmtpPool();
+  res.json({ ...pool, servers: (pool.servers || []).map((server) => sanitizeSmtp(server)) });
+});
+
+app.post("/admin/smtp", requireAuth, requireAdmin, async (req, res) => {
+  const { label = "", from = "", host = "", port, username = "", password = "", rotateAfter } = req.body || {};
+  if (!host || !username || !password) {
+    return res.status(400).json({ message: "host, username, and password are required" });
+  }
+  const pool = await loadSmtpPool();
+  const now = new Date().toISOString();
+  const server = {
+    id: uuid(),
+    label: label || username,
+    from: from || username,
+    host: host.trim(),
+    port: parseInt(port || "587", 10),
+    username: username.trim(),
+    password,
+    createdAt: now,
+    updatedAt: now,
+  };
+  pool.servers.push(server);
+  if (rotateAfter !== undefined) {
+    pool.rotateAfter = normalizeRotateAfter(rotateAfter);
+    pool.sentSinceRotation = 0;
+  }
+  await saveSmtpPool(pool);
+  res.status(201).json({ message: "SMTP added", server: sanitizeSmtp(server), rotateAfter: pool.rotateAfter });
+});
+
+app.put("/admin/smtp/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body || {};
+  const pool = await loadSmtpPool();
+  const server = (pool.servers || []).find((s) => s.id === id);
+  if (!server) return res.status(404).json({ message: "SMTP server not found" });
+  if (updates.label) server.label = updates.label;
+  if (updates.from) server.from = updates.from;
+  if (updates.host) server.host = updates.host;
+  if (updates.port) server.port = parseInt(updates.port, 10) || server.port;
+  if (updates.username) server.username = updates.username;
+  if (updates.password) server.password = updates.password;
+  if (updates.rotateAfter !== undefined) {
+    pool.rotateAfter = normalizeRotateAfter(updates.rotateAfter);
+    pool.sentSinceRotation = 0;
+  }
+  server.updatedAt = new Date().toISOString();
+  await saveSmtpPool(pool);
+  res.json({ message: "SMTP updated", server: sanitizeSmtp(server), rotateAfter: pool.rotateAfter });
+});
+
+app.delete("/admin/smtp/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const pool = await loadSmtpPool();
+  const idx = (pool.servers || []).findIndex((s) => s.id === id);
+  if (idx === -1) return res.status(404).json({ message: "SMTP server not found" });
+  pool.servers.splice(idx, 1);
+  if (pool.currentIndex >= pool.servers.length) {
+    pool.currentIndex = 0;
+    pool.sentSinceRotation = 0;
+  }
+  await saveSmtpPool(pool);
+  res.json({ message: "SMTP server removed", remaining: pool.servers.length });
+});
+
+app.post("/admin/smtp/rotation", requireAuth, requireAdmin, async (req, res) => {
+  const { rotateAfter } = req.body || {};
+  const pool = await loadSmtpPool();
+  pool.rotateAfter = normalizeRotateAfter(rotateAfter);
+  pool.sentSinceRotation = 0;
+  await saveSmtpPool(pool);
+  res.json({ message: `Rotation set to every ${pool.rotateAfter} emails`, rotateAfter: pool.rotateAfter });
+});
+
 // ---------- IP rotation & rate limits ----------
 app.get("/admin/ip-rotation", requireAuth, requireAdmin, async (_req, res) => {
   const data = await readJson(ipRotationFilePath, { proxies: [], currentIndex: 0 });
@@ -366,19 +549,18 @@ app.get("/api/jobs", requireAuth, async (req, res) => {
 app.post("/api/jobs", requireAuth, async (req, res) => {
   const {
     subject = "",
+    fromName = "",
+    from = "", // legacy support; admin controls SMTP from email
+    replyTo = "",
     textBody = "",
     htmlBody = "",
     recipients,
-    smtpUsername,
-    smtpPassword,
-    smtpHost,
-    smtpPort,
     batchSize,
     delayBetweenBatches = 2,
     maxRetries = 3,
   } = req.body || {};
-  if (!subject || !smtpUsername || !smtpPassword) {
-    return res.status(400).json({ message: "subject, smtpUsername, and smtpPassword are required" });
+  if (!subject || !fromName) {
+    return res.status(400).json({ message: "fromName and subject are required" });
   }
   const recipientList = normalizeRecipients(recipients);
   if (!recipientList.length) {
@@ -395,13 +577,12 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
     id: uuid(),
     owner,
     subject,
+    fromName,
+    from: from || undefined,
+    replyTo: replyTo || undefined,
     textBody,
     htmlBody,
     recipients: recipientList,
-    smtpUsername,
-    smtpPassword,
-    smtpHost: smtpHost || process.env.DEFAULT_SMTP_HOST || "email-smtp.us-east-1.amazonaws.com",
-    smtpPort: parseInt(smtpPort || process.env.DEFAULT_SMTP_PORT || "587", 10),
     batchSize: parseInt(batchSize || BATCH_SIZE_DEFAULT, 10),
     delayBetweenBatches: parseInt(delayBetweenBatches, 10),
     maxRetries: parseInt(maxRetries, 10),
@@ -411,7 +592,6 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   };
   payload.jobs.push(job);
   await writeJson(jobsFilePath, payload);
-  await addMailbox(owner, smtpUsername, smtpPassword);
   res.status(201).json(job);
 });
 
@@ -462,12 +642,26 @@ app.post("/api/jobs/:id/send", requireAuth, async (req, res) => {
   }
 });
 
+app.delete("/admin/jobs/:id/recipients", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const payload = await readJson(jobsFilePath, { jobs: [] });
+  const job = payload.jobs.find((j) => j.id === id);
+  if (!job) return res.status(404).json({ message: "Job not found" });
+  const removedCount = (job.recipients || []).length;
+  job.recipients = [];
+  job.updatedAt = new Date().toISOString();
+  await writeJson(jobsFilePath, payload);
+  res.json({ message: "Recipient log cleared", removed: removedCount });
+});
+
 // ---------- Overview & health ----------
 app.get("/admin/overview", requireAuth, requireAdmin, async (_req, res) => {
   const users = (await readJson(authFilePath, { users: [] })).users || [];
   const jobs = (await readJson(jobsFilePath, { jobs: [] })).jobs || [];
   const ipData = await readJson(ipRotationFilePath, { proxies: [], currentIndex: 0 });
   const rateLimits = await readJson(rateLimitFilePath, { limits: {} });
+  const smtpPool = await loadSmtpPool();
+  const sanitizedSmtpPool = { ...smtpPool, servers: (smtpPool.servers || []).map((s) => sanitizeSmtp(s)) };
   const stats = {
     totalUsers: users.length,
     activeUsers: users.filter((u) => (u.status || "active") === "active").length,
@@ -478,8 +672,9 @@ app.get("/admin/overview", requireAuth, requireAdmin, async (_req, res) => {
     failedJobs: jobs.filter((j) => j.status === "failed").length,
     proxyCount: (ipData.proxies || []).length,
     activeRateLimits: Object.keys(rateLimits.limits || {}).length,
+    smtpServers: sanitizedSmtpPool.servers.length,
   };
-  res.json({ users, jobs, ipRotation: ipData, rateLimits, stats });
+  res.json({ users, jobs, ipRotation: ipData, rateLimits, smtpPool: sanitizedSmtpPool, stats });
 });
 
 app.get("/healthz", async (_req, res) => {
@@ -494,6 +689,9 @@ app.get("/healthz", async (_req, res) => {
 // ---------- Mailer ----------
 async function sendEmailJob(job) {
   const recipients = normalizeRecipients(job.recipients);
+  if (!recipients.length) {
+    throw new Error("This job does not have any recipients to send to.");
+  }
   const batchSize = job.batchSize || BATCH_SIZE_DEFAULT;
   const results = [];
   let sentTotal = 0;
@@ -503,8 +701,33 @@ async function sendEmailJob(job) {
     const batch = recipients.slice(i, i + batchSize);
     try {
       const proxy = await getNextProxy();
-      await sendBatchWithSes(job, batch, proxy);
-      results.push({ success: true, sent_count: batch.length, recipients: batch, proxy });
+      const useSes = process.env.MAIL_TRANSPORT === "ses" && !(await hasConfiguredSmtpPool());
+      let smtpServer;
+      if (useSes) {
+        await sendBatchWithSes(job, batch, proxy);
+        results.push({
+          success: true,
+          sent_count: batch.length,
+          recipients: batch,
+          proxy,
+          transport: "ses",
+        });
+      } else {
+        smtpServer = await resolveSmtpServerForBatch(job);
+        await sendBatchWithSmtp(job, batch, smtpServer, proxy);
+        if (smtpServer?.__fromPool) {
+          await recordSmtpUsage(batch.length);
+        }
+        results.push({
+          success: true,
+          sent_count: batch.length,
+          recipients: batch,
+          proxy,
+          smtpId: smtpServer.id || smtpServer.username,
+          smtpLabel: smtpServer.label,
+          transport: "smtp",
+        });
+      }
       sentTotal += batch.length;
       if (job.delayBetweenBatches) {
         await new Promise((resolve) => setTimeout(resolve, job.delayBetweenBatches * 1000));
@@ -524,16 +747,17 @@ async function sendEmailJob(job) {
 }
 
 async function sendBatchWithSes(job, batch, proxyUrl) {
-  if (process.env.MAIL_TRANSPORT === "smtp") {
-    return sendBatchWithSmtp(job, batch, proxyUrl);
-  }
   const region = process.env.AWS_REGION || "us-east-1";
   const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
   const ses = new SESClient({
     region,
     requestHandler: new NodeHttpHandler(agent ? { httpsAgent: agent } : {}),
   });
-  const source = process.env.SES_FROM || job.smtpUsername;
+  const sourceEmail = process.env.SES_FROM || process.env.DEFAULT_FROM || job.from;
+  if (!sourceEmail) {
+    throw new Error("No FROM email configured. Set SES_FROM or DEFAULT_FROM.");
+  }
+  const source = formatFromAddress(job.fromName || job.from, sourceEmail);
   const params = {
     Destination: { ToAddresses: batch },
     Message: {
@@ -542,6 +766,9 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
     },
     Source: source,
   };
+  if (job.replyTo) {
+    params.ReplyToAddresses = [job.replyTo];
+  }
   if (job.htmlBody) {
     params.Message.Body.Html = { Data: job.htmlBody };
     params.Message.Body.Text = { Data: job.textBody || stripHtml(job.htmlBody) };
@@ -555,14 +782,46 @@ function stripHtml(html) {
   return html.replace(/<[^>]+>/g, " ");
 }
 
-async function sendBatchWithSmtp(job, batch, proxyUrl) {
+async function resolveSmtpServerForBatch(job) {
+  try {
+    const server = await pickSmtpServer();
+    return server;
+  } catch (err) {
+    if (job.smtpUsername && job.smtpPassword) {
+      // Legacy support for jobs created before SMTP pool existed
+      return {
+        id: "legacy",
+        label: job.smtpUsername,
+        from: job.from || job.replyTo || job.smtpUsername,
+        host: job.smtpHost || process.env.DEFAULT_SMTP_HOST || "email-smtp.us-east-1.amazonaws.com",
+        port: parseInt(job.smtpPort || process.env.DEFAULT_SMTP_PORT || "587", 10),
+        username: job.smtpUsername,
+        password: job.smtpPassword,
+      };
+    }
+    throw err;
+  }
+}
+
+async function hasConfiguredSmtpPool() {
+  const pool = await loadSmtpPool();
+  return (pool.servers || []).length > 0;
+}
+
+async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
+  const port = parseInt(smtpServer.port || "587", 10);
+  const fromEmail = smtpServer.from || smtpServer.username;
+  const fromAddress = formatFromAddress(job.fromName || job.from || smtpServer.label, fromEmail);
+  const replyToAddress = job.replyTo
+    ? formatFromAddress(undefined, job.replyTo)
+    : formatFromAddress(job.fromName || job.from, fromEmail);
   const transportOptions = {
-    host: job.smtpHost,
-    port: job.smtpPort,
-    secure: job.smtpPort === 465,
+    host: smtpServer.host,
+    port,
+    secure: port === 465,
     auth: {
-      user: job.smtpUsername,
-      pass: job.smtpPassword,
+      user: smtpServer.username,
+      pass: smtpServer.password,
     },
   };
   if (proxyUrl) {
@@ -574,35 +833,13 @@ async function sendBatchWithSmtp(job, batch, proxyUrl) {
   }
   const transporter = nodemailer.createTransport(transportOptions);
   await transporter.sendMail({
-    from: job.smtpUsername,
+    from: fromAddress,
+    replyTo: replyToAddress,
     to: batch,
     subject: job.subject,
     text: job.textBody,
     html: job.htmlBody,
   });
-}
-
-async function addMailbox(username, smtpUsername, smtpPassword) {
-  const payload = await readJson(authFilePath, { users: [] });
-  const user = payload.users.find((u) => u.username === username);
-  if (!user) return;
-  user.mailboxes = user.mailboxes || [];
-  const now = new Date().toISOString();
-  const existing = user.mailboxes.find((m) => m.smtpUsername === smtpUsername);
-  if (existing) {
-    existing.smtpPassword = smtpPassword;
-    existing.updatedAt = now;
-  } else {
-    user.mailboxes.push({
-      id: uuid(),
-      label: smtpUsername,
-      smtpUsername,
-      smtpPassword,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-  await writeJson(authFilePath, payload);
 }
 
 // ---------- Static ----------

@@ -14,6 +14,11 @@ Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compat
 - `data/` — JSON storage (auto-created/defaulted).
 - `scripts/build.js` — copies `public/` to `dist/` for upload.
 
+## SMTP pool & rotation
+- SMTP credentials are managed in the Admin panel only; the user dashboard no longer accepts SMTP usernames or passwords.
+- Admins can add multiple SMTP providers (Mailtrap, SES SMTP endpoint, Sender, etc.) and set the rotation threshold (defaults to every 200 sent emails).
+- Users provide only From/Subject/Recipients + body when creating jobs; sending pulls from the rotating SMTP pool.
+
 ## Local quick start (Node)
 1) Install Node 18+.  
 2) `npm install`  
