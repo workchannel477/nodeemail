@@ -500,11 +500,10 @@ document.addEventListener('alpine:init', () => {
         return value;
       }
     },
-    
     formatJobSummary(job) {
-      const sent = job.sentCount ?? (job.lastResult && job.lastResult.sent) ?? 0;
-      const failed = job.failedCount ?? (job.lastResult && job.lastResult.failed) ?? 0;
-      const total = job.recipientsCount ?? (job.recipients || []).length;
+      const sent = job.sentCount ?? job.lastResult?.sent ?? 0;
+      const failed = job.failedCount ?? job.lastResult?.failed ?? 0;
+      const total = job.recipientsCount ?? job.recipients?.length || 0;
       const parts = [`${sent}/${total || '?'} sent`];
       if (failed) parts.push(`${failed} failed`);
       if (job.status === 'sending') parts.push('sending...');
@@ -673,7 +672,7 @@ document.addEventListener('alpine:init', () => {
         
         // Clear form
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-        this.message = 'Job created successfully!';
+        this.message = 'Job queued and sending now.';
         
         setTimeout(() => {
           this.message = '';

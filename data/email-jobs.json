@@ -1,3 +1,113 @@
 {
-  "jobs": []
+  "jobs": [
+    {
+      "id": "4d00b7b4-c138-4cb2-b8dd-aac47ccf4f9d",
+      "owner": "admin",
+      "subject": "Testing",
+      "fromName": "Marketing",
+      "replyTo": "workloadx@gmail.com",
+      "textBody": "",
+      "htmlBody": "Testing",
+      "recipients": [
+        "workchannel09@gmail.com"
+      ],
+      "batchSize": 50,
+      "delayBetweenBatches": 2,
+      "maxRetries": 3,
+      "status": "sent",
+      "createdAt": "2025-12-10T15:15:32.889Z",
+      "updatedAt": "2025-12-10T15:15:39.292Z",
+      "lastSentAt": "2025-12-10T15:15:39.292Z",
+      "lastResult": {
+        "sent": 1,
+        "failed": 0,
+        "batches": 1
+      },
+      "sentCount": 1,
+      "failedCount": 0
+    },
+    {
+      "id": "0a508d3e-8ee9-4f44-9a9f-791782d02445",
+      "owner": "admin",
+      "subject": "Testing",
+      "fromName": "Marketing",
+      "replyTo": "workloadx@gmail.com",
+      "textBody": "",
+      "htmlBody": "Hey you, this is a test mail",
+      "recipients": [
+        "workchannel09@gmail.com",
+        "bloom.eeoii@gmail.com"
+      ],
+      "batchSize": 50,
+      "delayBetweenBatches": 2,
+      "maxRetries": 3,
+      "status": "sent",
+      "createdAt": "2025-12-10T15:18:29.820Z",
+      "updatedAt": "2025-12-10T15:18:35.290Z",
+      "lastSentAt": "2025-12-10T15:18:35.290Z",
+      "lastResult": {
+        "sent": 2,
+        "failed": 0,
+        "batches": 1
+      },
+      "sentCount": 2,
+      "failedCount": 0
+    },
+    {
+      "id": "31c0393d-6f7f-426b-bea8-c07727e6d90f",
+      "owner": "admin",
+      "subject": "Testing",
+      "fromName": "Marketing",
+      "replyTo": "workloadx@gmail.com",
+      "textBody": "",
+      "htmlBody": "Testing",
+      "recipientsCount": 2,
+      "recipientsPreview": [
+        "workchannel09@gmail.com",
+        "bloom.eeoii@gmail.com"
+      ],
+      "batchSize": 50,
+      "delayBetweenBatches": 2,
+      "maxRetries": 3,
+      "status": "sent",
+      "createdAt": "2025-12-10T15:48:45.005Z",
+      "updatedAt": "2025-12-10T15:48:54.901Z",
+      "lastSentAt": "2025-12-10T15:48:54.901Z",
+      "lastResult": {
+        "sent": 2,
+        "failed": 0,
+        "batches": 1
+      },
+      "sentCount": 2,
+      "failedCount": 0
+    },
+    {
+      "id": "7704a8ec-4f10-46de-98bb-cefb67e5e91e",
+      "owner": "admin",
+      "subject": "Testing",
+      "fromName": "Marketing",
+      "replyTo": "workloadx@gmail.com",
+      "textBody": "",
+      "htmlBody": "Testing",
+      "recipientsCount": 2,
+      "recipientsPreview": [
+        "workchannel09@gmail.com",
+        "bloom.eeoii@gmail.com"
+      ],
+      "batchSize": 50,
+      "delayBetweenBatches": 2,
+      "maxRetries": 3,
+      "status": "sent",
+      "createdAt": "2025-12-10T15:56:30.840Z",
+      "updatedAt": "2025-12-10T15:56:39.590Z",
+      "lastSentAt": "2025-12-10T15:56:39.590Z",
+      "lastResult": {
+        "sent": 2,
+        "failed": 0,
+        "batches": 1
+      },
+      "sentCount": 2,
+      "failedCount": 0
+    }
+  ]
 }

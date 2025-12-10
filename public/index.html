@@ -6,23 +6,8 @@
     <title>Email Control Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./config.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>
-      .rte-toolbar button {
-        padding: 0.35rem 0.5rem;
-        font-size: 0.75rem;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.35rem;
-        color: #334155;
-      }
-      .rte-toolbar button:hover {
-        background: #e2e8f0;
-      }
-      .rte-area {
-        min-height: 180px;
-      }
-    </style>
+    <script defer src="./admin.js"></script>
+    <script defer src="./alpinejs.min.js"></script>
   </head>
   <body class="bg-slate-100 min-h-screen">
     <div class="max-w-6xl mx-auto px-4 py-10" x-data="dashboardApp()" x-init="init()">
@@ -72,12 +57,11 @@
               <h2 class="text-xl font-semibold text-slate-700">Create email job</h2>
               <span class="text-sm text-slate-400" x-show="busy">Working...</span>
             </div>
-            <p class="text-sm text-slate-500 mb-4">SMTP credentials rotate automatically (admin-managed). Provide the from name, subject, and recipients for each job.</p>
             <form class="grid gap-4" @submit.prevent="createJob">
               <div>
                 <label class="block text-sm font-medium text-slate-600">From name</label>
                 <input type="text" x-model.trim="form.fromName" placeholder="Marketing Team" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
-                <p class="text-xs text-slate-400 mt-1">Admin controls the from email; you only set the display name.</p>
+                <p class="text-xs text-slate-400 mt-1">Set the display name.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-slate-600">Reply-To (optional)</label>
@@ -91,34 +75,16 @@
                 <label class="block text-sm font-medium text-slate-600">Recipients</label>
                 <textarea rows="2" x-model="form.recipients" placeholder="one@example.com, two@example.com" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required></textarea>
               </div>
-              <div class="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-slate-600">Plain text body</label>
-                  <textarea rows="4" x-model="form.textBody" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"></textarea>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-slate-600">HTML body</label>
-                  <div class="mt-1 border border-slate-300 rounded">
-                    <div class="rte-toolbar flex flex-wrap gap-2 px-2 py-2 border-b border-slate-200">
-                      <button type="button" @click="format('bold')">Bold</button>
-                      <button type="button" @click="format('italic')">Italic</button>
-                      <button type="button" @click="format('underline')">Underline</button>
-                      <button type="button" @click="format('insertUnorderedList')">• List</button>
-                      <button type="button" @click="format('insertOrderedList')">1. List</button>
-                      <button type="button" @click="insertImage()">Image</button>
-                      <button type="button" @click="insertLink()">Link</button>
-                      <button type="button" @click="clearHtml()">Clear</button>
-                    </div>
-                    <div x-ref="htmlEditor"
-                         class="rte-area px-3 py-2 focus:outline-none"
-                         contenteditable="true"
-                         @input="form.htmlBody = $event.target.innerHTML"
-                         @blur="form.htmlBody = $event.target.innerHTML"
-                         x-html="form.htmlBody"></div>
-                  </div>
-                  <textarea x-model="form.htmlBody" class="hidden"></textarea>
-                  <p class="text-xs text-slate-400 mt-1">Built-in lightweight editor (no external CDN).</p>
-                </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600">HTML body</label>
+                <textarea
+                  rows="10"
+                  dir="ltr"
+                  x-model="form.htmlBody"
+                  placeholder="Write or paste your HTML email here"
+                  class="mt-1 w-full rounded border border-slate-300 px-3 py-3 focus:outline-none focus:ring focus:ring-indigo-200 font-mono text-sm"
+                  style="min-height: 220px;"></textarea>
+                <p class="text-xs text-slate-400 mt-1">Emails will send using this HTML content; a plain text copy is generated automatically.</p>
               </div>
               <button type="submit" class="self-start bg-indigo-600 text-white font-medium px-6 py-2 rounded hover:bg-indigo-500" x-bind:disabled="busy">
                 Save job
@@ -143,6 +109,8 @@
                     <th class="py-2 pr-4">Subject</th>
                     <th class="py-2 pr-4">From</th>
                     <th class="py-2 pr-4">Recipients</th>
+                    <th class="py-2 pr-4">Status</th>
+                    <th class="py-2 pr-4">Summary</th>
                     <th class="py-2 pr-4">Owner</th>
                     <th class="py-2 pr-4">Updated</th>
                     <th class="py-2 pr-4">Actions</th>
@@ -156,12 +124,28 @@
                         <span x-text="job.fromName || job.from || 'Admin default'"></span>
                       </td>
                       <td class="py-2 pr-4 text-slate-500">
-                        <span x-text="job.recipients.join(', ')"></span>
+                        <span x-text="(job.recipientsPreview || job.recipients || []).join(', ')"></span>
+                        <span class="text-xs text-slate-400" x-text="job.recipientsCount ? `(${job.recipientsCount} total)` : ''"></span>
                       </td>
+                      <td class="py-2 pr-4">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
+                              :class="{
+                                'bg-green-100 text-green-700': job.status === 'sent',
+                                'bg-yellow-100 text-yellow-700': job.status === 'pending',
+                                'bg-red-100 text-red-700': job.status === 'failed',
+                                'bg-blue-100 text-blue-700': job.status === 'sending'
+                              }">
+                          <span class="mr-1">&#9679;</span>
+                          <span x-text="job.status"></span>
+                        </span>
+                      </td>
+                      <td class="py-2 pr-4 text-slate-600" x-text="formatJobSummary(job)"></td>
                       <td class="py-2 pr-4 text-slate-500" x-text="job.owner"></td>
                       <td class="py-2 pr-4 text-slate-500" x-text="formatDate(job.updatedAt)"></td>
                       <td class="py-2 pr-4 flex gap-2 flex-wrap">
-                        <button class="px-3 py-1 bg-emerald-500 text-white rounded" @click="triggerSend(job.id)">Send</button>
+                        <button class="px-3 py-1 bg-emerald-500 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                                @click="triggerSend(job.id)"
+                                :disabled="job.status === 'sending'">Send</button>
                         <button class="px-3 py-1 bg-rose-500 text-white rounded" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
                       </td>
                     </tr>
@@ -174,207 +158,5 @@
         </div>
       </template>
     </div>
-
-    <script>
-      const apiUrl = (path) => (window.API ? window.API.url(path) : path);
-      document.addEventListener('alpine:init', () => {
-        Alpine.data('dashboardApp', () => ({
-          token: localStorage.getItem('mailer_token') || '',
-          user: JSON.parse(localStorage.getItem('mailer_user') || 'null'),
-          jobs: [],
-          busy: false,
-          message: '',
-          error: '',
-          loginForm: { username: '', password: '' },
-          form: {
-            fromName: '',
-            replyTo: '',
-            subject: '',
-            recipients: '',
-            textBody: '',
-            htmlBody: ''
-          },
-          init() {
-            if (this.token) {
-              this.fetchJobs();
-              this.refreshProfile();
-            }
-            this.$nextTick(() => {
-              if (this.$refs.htmlEditor) {
-                this.$refs.htmlEditor.innerHTML = this.form.htmlBody || '';
-              }
-            });
-          },
-          get isAdmin() {
-            return this.user?.role === 'admin';
-          },
-          headers() {
-            const headers = { 'Content-Type': 'application/json' };
-            if (this.token) headers.Authorization = `Bearer ${this.token}`;
-            return headers;
-          },
-          async login() {
-            this.error = '';
-            this.busy = true;
-            try {
-              const response = await fetch(apiUrl('/auth/login'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.loginForm)
-              });
-              if (!response.ok) throw new Error('Invalid username or password');
-              const data = await response.json();
-              this.token = data.token;
-              this.user = { username: data.username, role: data.role, mailboxes: data.mailboxes || [] };
-              localStorage.setItem('mailer_token', this.token);
-              localStorage.setItem('mailer_user', JSON.stringify(this.user));
-              this.loginForm.password = '';
-              await this.fetchJobs();
-            } catch (error) {
-              this.error = error.message;
-            } finally {
-              this.busy = false;
-            }
-          },
-          async logout() {
-            if (this.token) {
-              try {
-                await fetch(apiUrl('/auth/logout'), { method: 'POST', headers: this.headers() });
-              } catch (error) {
-                console.warn(error);
-              }
-            }
-            localStorage.removeItem('mailer_token');
-            localStorage.removeItem('mailer_user');
-            this.token = '';
-            this.user = null;
-            this.jobs = [];
-          },
-          async refreshProfile() {
-            if (!this.token) return;
-            try {
-              const response = await fetch(apiUrl('/auth/me'), { headers: this.headers() });
-              if (!response.ok) throw new Error('Unable to fetch profile');
-              const data = await response.json();
-              this.user = data;
-              localStorage.setItem('mailer_user', JSON.stringify(data));
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          async fetchJobs() {
-            if (!this.token) return;
-            this.error = '';
-            try {
-              const response = await fetch(apiUrl('/api/jobs'), { headers: this.headers() });
-              if (!response.ok) throw new Error('Unable to load jobs');
-              this.jobs = await response.json();
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          async createJob() {
-            this.error = '';
-            this.message = '';
-            if (!this.form.fromName || !this.form.subject || !this.form.recipients) {
-              this.error = 'From name, subject, and recipients are required.';
-              return;
-            }
-            this.busy = true;
-            try {
-              const response = await fetch(apiUrl('/api/jobs'), {
-                method: 'POST',
-                headers: this.headers(),
-                body: JSON.stringify(this.form)
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.message || 'Failed to create job');
-              Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-              if (this.$refs.htmlEditor) {
-                this.$refs.htmlEditor.innerHTML = '';
-              }
-              this.message = 'Job stored successfully.';
-              setTimeout(() => (this.message = ''), 4000);
-              await Promise.all([this.fetchJobs(), this.refreshProfile()]);
-            } catch (error) {
-              this.error = error.message;
-            } finally {
-              this.busy = false;
-            }
-          },
-          async triggerSend(id) {
-            if (!confirm('Trigger this job now?')) return;
-            try {
-              const response = await fetch(apiUrl(`/api/jobs/${id}/send`), {
-                method: 'POST',
-                headers: this.headers()
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.message || 'Failed to send job');
-              this.message = data.message;
-              setTimeout(() => (this.message = ''), 4000);
-              await this.fetchJobs();
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          async deleteJob(id) {
-            if (!confirm('Delete this job?')) return;
-            try {
-              const response = await fetch(apiUrl(`/api/jobs/${id}`), {
-                method: 'DELETE',
-                headers: this.headers()
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.message || 'Failed to delete job');
-              this.message = data.message;
-              setTimeout(() => (this.message = ''), 4000);
-              await this.fetchJobs();
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          formatDate(value) {
-            if (!value) return '-';
-            try {
-              return new Date(value).toLocaleString();
-            } catch (error) {
-              return value;
-            }
-          },
-          format(command) {
-            document.execCommand(command, false, null);
-            if (this.$refs.htmlEditor) {
-              this.form.htmlBody = this.$refs.htmlEditor.innerHTML;
-            }
-          },
-          insertLink() {
-            const url = prompt('Enter URL');
-            if (!url) return;
-            document.execCommand('createLink', false, url);
-            if (this.$refs.htmlEditor) {
-              this.form.htmlBody = this.$refs.htmlEditor.innerHTML;
-            }
-          },
-          insertImage() {
-            const url = prompt('Image URL');
-            if (!url) return;
-            document.execCommand('insertImage', false, url);
-            if (this.$refs.htmlEditor) {
-              this.form.htmlBody = this.$refs.htmlEditor.innerHTML;
-            }
-          },
-          clearHtml() {
-            if (this.$refs.htmlEditor) {
-              this.$refs.htmlEditor.innerHTML = '';
-            }
-            this.form.htmlBody = '';
-          },
-          openAdmin() {
-            window.location.href = '/admin.html';
-          }
-        }));
-      });
-    </script>
   </body>
 </html>

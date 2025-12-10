@@ -1,18 +1,18 @@
 # Email Management Stack (Node.js API + Alpine.js UI)
 
-Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compatible if Node is enabled, also deployable to Vercel/Netlify functions) and a static Alpine.js + Tailwind dashboard. Email dispatch uses AWS SES by default, with optional SMTP + proxy support. Data lives in JSON files under `data/`.
+Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compatible if Node is enabled, also deployable to Vercel/Netlify functions) and an Alpine.js + Tailwind dashboard bundled via Webpack. Email dispatch uses AWS SES by default, with optional SMTP + proxy support. Data lives in JSON files under `data/`.
 
 ## Architecture
 - **Backend**: Node.js/Express (`api/server.js`) with routes for auth, users/admin, jobs, rate limits, and IP rotation. Email sending uses AWS SES SDK; optional `MAIL_TRANSPORT=smtp` will use SMTP via Nodemailer (supports proxy and IP rotation list).
-- **Frontend**: Static Alpine.js + Tailwind pages in `public/`; `public/config.js` sets the API base (defaults to `/api` on the same domain).
+- **Frontend**: Alpine.js + Tailwind pages bundled by Webpack from `src/` with HTML templates in `public/`; `public/config.js` sets the API base (defaults to `/api` on the same domain).
 - **Data**: JSON stores (`data/auth.json`, `data/email-jobs.json`, `data/ip-rotation.json`, `data/rate-limit.json`).
 
 ## Repo layout
-- `api/server.js` — Express API entry.
-- `public/` — static UI; upload as-is to your web root (or `dist/` after `npm run build`).
-- `public/config.js` — set `window.APP_CONFIG.apiBase` if your API runs elsewhere.
-- `data/` — JSON storage (auto-created/defaulted).
-- `scripts/build.js` — copies `public/` to `dist/` for upload.
+- `api/server.js` – Express API entry.
+- `src/` – frontend entrypoints (`user.js`, `admin.js`) bundled by Webpack.
+- `public/` – HTML templates + `config.js` (copied into dist); built assets land in `dist/` after `npm run build`.
+- `data/` – JSON storage (auto-created/defaulted).
+- `dist/` – generated static output served by Express in production.
 
 ## SMTP pool & rotation
 - SMTP credentials are managed in the Admin panel only; the user dashboard no longer accepts SMTP usernames or passwords.
@@ -22,8 +22,9 @@ Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compat
 ## Local quick start (Node)
 1) Install Node 18+.  
 2) `npm install`  
-3) Backend/API + static UI: `npm start` (same as `npm run api`, serves API + static files).  
-4) Frontend dev server: `npm run dev` (serves http://localhost:8080, calls the API at http://localhost:5000 by default).
+3) Dev (frontend + backend together): `npm run dev` (Webpack dev server on http://localhost:8080 proxies API calls to http://localhost:5000 while Nodemon runs the API).  
+4) API only: `npm run api` (or `npm run api:dev` with Nodemon).  
+5) Production: `npm run build` then `npm start` (serves `dist/` from Express on port 5000 by default).
 
 ## Deploy
 - **Render (single service)**: create a Web Service, set Build Command to `npm run build`, Start Command to `npm start`, and add a persistent disk mounted at `/app/data` so the JSON stores survive restarts. Optionally set `API_BASE`/`API_BASE_OVERRIDE` to force a specific API base URL (default is same-origin).  

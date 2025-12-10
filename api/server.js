@@ -19,9 +19,8 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, "..");
 const dataDir = path.join(rootDir, "data");
 const logDir = path.join(rootDir, "logs");
-const staticDir = fs.existsSync(path.join(rootDir, "dist"))
-  ? path.join(rootDir, "dist")
-  : path.join(rootDir, "public");
+const staticDir = path.join(rootDir, "public");
+const recipientsDir = path.join(dataDir, "job-recipients");
 
 const authFilePath = path.join(dataDir, "auth.json");
 const jobsFilePath = path.join(dataDir, "email-jobs.json");
@@ -66,6 +65,7 @@ app.use((req, res, next) => {
 async function ensureDataFiles() {
   await fs.ensureDir(dataDir);
   await fs.ensureDir(logDir);
+  await fs.ensureDir(recipientsDir);
   if (!(await fs.pathExists(authFilePath))) {
     const salt = cryptoSalt();
     await fs.writeJson(authFilePath, {
@@ -126,6 +126,41 @@ function hashPassword(password, salt) {
 
 function cryptoSalt() {
   return uuid().replace(/-/g, "");
+}
+
+function recipientsFile(jobId) {
+  return path.join(recipientsDir, `${jobId}.json`);
+}
+
+async function saveRecipients(jobId, recipients = []) {
+  const list = normalizeRecipients(recipients);
+  await fs.writeJson(recipientsFile(jobId), { recipients: list }, { spaces: 0 });
+}
+
+async function loadRecipients(job) {
+  const collected = [];
+  // Prefer stored file
+  try {
+    const data = await fs.readJson(recipientsFile(job.id));
+    if (Array.isArray(data.recipients)) collected.push(...data.recipients);
+  } catch (err) {
+    // ignore
+  }
+  // Fallback to job payload (array or string)
+  if (Array.isArray(job.recipients)) collected.push(...job.recipients);
+  if (typeof job.recipients === "string") collected.push(...normalizeRecipients(job.recipients));
+  return normalizeRecipients(collected);
+}
+
+async function loadRecipientsPreview(jobId, limit = 5, fallbackList = []) {
+  try {
+    const data = await fs.readJson(recipientsFile(jobId));
+    const list = Array.isArray(data.recipients) ? data.recipients : [];
+    return { recipientsPreview: list.slice(0, limit), recipientsCount: list.length };
+  } catch (err) {
+    const list = Array.isArray(fallbackList) ? fallbackList : normalizeRecipients(fallbackList);
+    return { recipientsPreview: list.slice(0, limit), recipientsCount: list.length };
+  }
 }
 
 function normalizeRecipients(recipients = []) {
@@ -543,7 +578,13 @@ app.post("/admin/rate-limits/reset", requireAuth, requireAdmin, async (req, res)
 app.get("/api/jobs", requireAuth, async (req, res) => {
   const { jobs = [] } = await readJson(jobsFilePath, { jobs: [] });
   const filtered = req.user.role === "admin" ? jobs : jobs.filter((j) => j.owner === req.user.username);
-  res.json(filtered);
+  const jobsWithPreview = await Promise.all(
+    filtered.map(async (job) => {
+      const { recipientsPreview, recipientsCount } = await loadRecipientsPreview(job.id, 5, job.recipients);
+      return { ...job, recipientsPreview, recipientsCount };
+    })
+  );
+  res.json(jobsWithPreview);
 });
 
 app.post("/api/jobs", requireAuth, async (req, res) => {
@@ -582,7 +623,8 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
     replyTo: replyTo || undefined,
     textBody,
     htmlBody,
-    recipients: recipientList,
+    recipientsCount: recipientList.length,
+    recipientsPreview: recipientList.slice(0, 5),
     batchSize: parseInt(batchSize || BATCH_SIZE_DEFAULT, 10),
     delayBetweenBatches: parseInt(delayBetweenBatches, 10),
     maxRetries: parseInt(maxRetries, 10),
@@ -592,6 +634,13 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   };
   payload.jobs.push(job);
   await writeJson(jobsFilePath, payload);
+  await saveRecipients(job.id, recipientList);
+  // Kick off sending immediately in the background
+  setImmediate(() => {
+    dispatchJob(job, payload).catch((err) => {
+      console.error("Auto-dispatch failed for job", job.id, err.message);
+    });
+  });
   res.status(201).json(job);
 });
 
@@ -604,6 +653,7 @@ app.delete("/api/jobs/:id", requireAuth, async (req, res) => {
   if (idx === -1) return res.status(404).json({ message: "Job not found" });
   const removed = payload.jobs.splice(idx, 1)[0];
   await writeJson(jobsFilePath, payload);
+  await fs.remove(recipientsFile(id));
   res.json({ message: "Job deleted", job: removed });
 });
 
@@ -615,30 +665,15 @@ app.post("/api/jobs/:id/send", requireAuth, async (req, res) => {
   if (req.user.role !== "admin" && job.owner !== req.user.username) {
     return res.status(403).json({ message: "You cannot trigger this job" });
   }
-  const allowed = await checkEmailRateLimit(job.owner);
-  if (!allowed) {
-    return res.status(429).json({
-      message: `Email rate limit exceeded. Maximum ${EMAIL_RATE_LIMIT} emails per minute.`,
-      retryAfter: 60,
-    });
+  if (job.status === "sending") {
+    return res.status(409).json({ message: "Job is already sending" });
   }
-  job.status = "sending";
-  job.updatedAt = new Date().toISOString();
-  await writeJson(jobsFilePath, payload);
   try {
-    const result = await sendEmailJob(job);
-    job.status = result.success ? "sent" : "failed";
-    job.lastSentAt = new Date().toISOString();
-    job.updatedAt = new Date().toISOString();
-    job.lastResult = result;
-    await writeJson(jobsFilePath, payload);
+    const result = await dispatchJob(job, payload);
     res.json({ message: "Email dispatch complete", job, result });
   } catch (err) {
-    job.status = "failed";
-    job.error = err.message;
-    job.updatedAt = new Date().toISOString();
-    await writeJson(jobsFilePath, payload);
-    res.status(500).json({ message: "Failed to send email", details: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message || "Failed to send email" });
   }
 });
 
@@ -647,17 +682,26 @@ app.delete("/admin/jobs/:id/recipients", requireAuth, requireAdmin, async (req, 
   const payload = await readJson(jobsFilePath, { jobs: [] });
   const job = payload.jobs.find((j) => j.id === id);
   if (!job) return res.status(404).json({ message: "Job not found" });
-  const removedCount = (job.recipients || []).length;
+  const { recipientsCount = 0 } = await loadRecipientsPreview(id);
+  job.recipientsCount = 0;
+  job.recipientsPreview = [];
   job.recipients = [];
   job.updatedAt = new Date().toISOString();
   await writeJson(jobsFilePath, payload);
-  res.json({ message: "Recipient log cleared", removed: removedCount });
+  await fs.remove(recipientsFile(id));
+  res.json({ message: "Recipient log cleared", removed: recipientsCount });
 });
 
 // ---------- Overview & health ----------
 app.get("/admin/overview", requireAuth, requireAdmin, async (_req, res) => {
   const users = (await readJson(authFilePath, { users: [] })).users || [];
-  const jobs = (await readJson(jobsFilePath, { jobs: [] })).jobs || [];
+  const jobsRaw = (await readJson(jobsFilePath, { jobs: [] })).jobs || [];
+  const jobs = await Promise.all(
+    jobsRaw.map(async (job) => {
+      const { recipientsPreview, recipientsCount } = await loadRecipientsPreview(job.id, 5, job.recipients);
+      return { ...job, recipientsPreview, recipientsCount };
+    })
+  );
   const ipData = await readJson(ipRotationFilePath, { proxies: [], currentIndex: 0 });
   const rateLimits = await readJson(rateLimitFilePath, { limits: {} });
   const smtpPool = await loadSmtpPool();
@@ -668,8 +712,11 @@ app.get("/admin/overview", requireAuth, requireAdmin, async (_req, res) => {
     suspendedUsers: users.filter((u) => (u.status || "active") === "suspended").length,
     totalJobs: jobs.length,
     pendingJobs: jobs.filter((j) => j.status === "pending").length,
+    sendingJobs: jobs.filter((j) => j.status === "sending").length,
     sentJobs: jobs.filter((j) => j.status === "sent").length,
     failedJobs: jobs.filter((j) => j.status === "failed").length,
+    sentEmails: jobs.reduce((acc, j) => acc + (j.sentCount || 0), 0),
+    failedEmails: jobs.reduce((acc, j) => acc + (j.failedCount || 0), 0),
     proxyCount: (ipData.proxies || []).length,
     activeRateLimits: Object.keys(rateLimits.limits || {}).length,
     smtpServers: sanitizedSmtpPool.servers.length,
@@ -688,7 +735,7 @@ app.get("/healthz", async (_req, res) => {
 
 // ---------- Mailer ----------
 async function sendEmailJob(job) {
-  const recipients = normalizeRecipients(job.recipients);
+  const recipients = await loadRecipients(job);
   if (!recipients.length) {
     throw new Error("This job does not have any recipients to send to.");
   }
@@ -704,31 +751,20 @@ async function sendEmailJob(job) {
       const useSes = process.env.MAIL_TRANSPORT === "ses" && !(await hasConfiguredSmtpPool());
       let smtpServer;
       if (useSes) {
-        await sendBatchWithSes(job, batch, proxy);
-        results.push({
-          success: true,
-          sent_count: batch.length,
-          recipients: batch,
-          proxy,
-          transport: "ses",
-        });
+        const sesResult = await sendBatchWithSes(job, batch, proxy);
+        results.push({ ...sesResult, proxy, transport: "ses" });
+        sentTotal += sesResult.sent;
+        failedTotal += sesResult.failed;
       } else {
         smtpServer = await resolveSmtpServerForBatch(job);
-        await sendBatchWithSmtp(job, batch, smtpServer, proxy);
+        const smtpResult = await sendBatchWithSmtp(job, batch, smtpServer, proxy);
         if (smtpServer?.__fromPool) {
-          await recordSmtpUsage(batch.length);
+          await recordSmtpUsage(smtpResult.sent || batch.length);
         }
-        results.push({
-          success: true,
-          sent_count: batch.length,
-          recipients: batch,
-          proxy,
-          smtpId: smtpServer.id || smtpServer.username,
-          smtpLabel: smtpServer.label,
-          transport: "smtp",
-        });
+        results.push({ ...smtpResult, proxy });
+        sentTotal += smtpResult.sent;
+        failedTotal += smtpResult.failed;
       }
-      sentTotal += batch.length;
       if (job.delayBetweenBatches) {
         await new Promise((resolve) => setTimeout(resolve, job.delayBetweenBatches * 1000));
       }
@@ -758,28 +794,86 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
     throw new Error("No FROM email configured. Set SES_FROM or DEFAULT_FROM.");
   }
   const source = formatFromAddress(job.fromName || job.from, sourceEmail);
-  const params = {
-    Destination: { ToAddresses: batch },
-    Message: {
-      Subject: { Data: job.subject },
-      Body: {},
-    },
-    Source: source,
-  };
-  if (job.replyTo) {
-    params.ReplyToAddresses = [job.replyTo];
+  let sent = 0;
+  let failed = 0;
+  for (const recipient of batch) {
+    const params = {
+      Destination: { ToAddresses: [recipient] },
+      Message: {
+        Subject: { Data: job.subject },
+        Body: {},
+      },
+      Source: source,
+    };
+    if (job.replyTo) {
+      params.ReplyToAddresses = [job.replyTo];
+    }
+    if (job.htmlBody) {
+      params.Message.Body.Html = { Data: job.htmlBody };
+      params.Message.Body.Text = { Data: job.textBody || stripHtml(job.htmlBody) };
+    } else {
+      params.Message.Body.Text = { Data: job.textBody || "" };
+    }
+    try {
+      await ses.send(new SendEmailCommand(params));
+      sent += 1;
+    } catch (err) {
+      failed += 1;
+    }
   }
-  if (job.htmlBody) {
-    params.Message.Body.Html = { Data: job.htmlBody };
-    params.Message.Body.Text = { Data: job.textBody || stripHtml(job.htmlBody) };
-  } else {
-    params.Message.Body.Text = { Data: job.textBody || "" };
-  }
-  await ses.send(new SendEmailCommand(params));
+  return { success: failed === 0, sent, failed, recipients: batch };
 }
 
 function stripHtml(html) {
   return html.replace(/<[^>]+>/g, " ");
+}
+
+function buildSendSummary(result = {}) {
+  return {
+    sent: result.sent || 0,
+    failed: result.failed || 0,
+    batches: Array.isArray(result.results) ? result.results.length : 0,
+  };
+}
+
+async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
+  job.status = "sending";
+  job.updatedAt = new Date().toISOString();
+  await writeJson(jobsFilePath, payload);
+
+  if (!skipRateLimit) {
+    const allowed = await checkEmailRateLimit(job.owner);
+    if (!allowed) {
+      const errMsg = `Email rate limit exceeded. Maximum ${EMAIL_RATE_LIMIT} emails per minute.`;
+      job.status = "failed";
+      job.error = errMsg;
+      job.updatedAt = new Date().toISOString();
+      await writeJson(jobsFilePath, payload);
+      const rateErr = new Error(errMsg);
+      rateErr.statusCode = 429;
+      throw rateErr;
+    }
+  }
+
+  try {
+    const result = await sendEmailJob(job);
+    const summary = buildSendSummary(result);
+    job.status = result.success ? "sent" : "failed";
+    job.lastSentAt = new Date().toISOString();
+    job.lastResult = summary;
+    job.sentCount = summary.sent;
+    job.failedCount = summary.failed;
+    delete job.error;
+    job.updatedAt = new Date().toISOString();
+    await writeJson(jobsFilePath, payload);
+    return result;
+  } catch (err) {
+    job.status = "failed";
+    job.error = err.message;
+    job.updatedAt = new Date().toISOString();
+    await writeJson(jobsFilePath, payload);
+    throw err;
+  }
 }
 
 async function resolveSmtpServerForBatch(job) {
@@ -832,14 +926,32 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
     }
   }
   const transporter = nodemailer.createTransport(transportOptions);
-  await transporter.sendMail({
-    from: fromAddress,
-    replyTo: replyToAddress,
-    to: batch,
-    subject: job.subject,
-    text: job.textBody,
-    html: job.htmlBody,
-  });
+  let sent = 0;
+  let failed = 0;
+  for (const recipient of batch) {
+    try {
+      await transporter.sendMail({
+        from: fromAddress,
+        replyTo: replyToAddress,
+        to: recipient,
+        subject: job.subject,
+        text: job.textBody || (job.htmlBody ? stripHtml(job.htmlBody) : ""),
+        html: job.htmlBody,
+      });
+      sent += 1;
+    } catch (err) {
+      failed += 1;
+    }
+  }
+  return {
+    success: failed === 0,
+    sent,
+    failed,
+    recipients: batch,
+    smtpId: smtpServer.id || smtpServer.username,
+    smtpLabel: smtpServer.label,
+    transport: "smtp",
+  };
 }
 
 // ---------- Static ----------

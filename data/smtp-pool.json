@@ -1,1 +1,19 @@
-{"servers":[],"currentIndex":0,"sentSinceRotation":0,"rotateAfter":200,"updatedAt":"2025-12-05T11:59:37.332Z"}
+{
+  "servers": [
+    {
+      "id": "41fca01b-3ffd-4bcf-b562-621b1ec10f43",
+      "label": "Zoho",
+      "from": "no.reply.hasutighsbsusgsh@zohomail.com",
+      "host": "smtp.zoho.com",
+      "port": 465,
+      "username": "no.reply.hasutighsbsusgsh",
+      "password": "h9anLV9REeNh",
+      "createdAt": "2025-12-10T15:14:45.893Z",
+      "updatedAt": "2025-12-10T15:14:45.893Z"
+    }
+  ],
+  "currentIndex": 0,
+  "sentSinceRotation": 7,
+  "rotateAfter": 200,
+  "updatedAt": "2025-12-10T15:56:37.578Z"
+}
