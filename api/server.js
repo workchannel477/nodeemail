@@ -163,17 +163,23 @@ async function loadRecipientsPreview(jobId, limit = 5, fallbackList = []) {
   }
 }
 
+const RECIPIENT_DELIMITER_REGEX = /[\s,;|:]+/;
+
+function flattenRecipientInput(value) {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenRecipientInput);
+  }
+  if (typeof value === "string") {
+    return value.split(RECIPIENT_DELIMITER_REGEX);
+  }
+  return [value];
+}
+
 function normalizeRecipients(recipients = []) {
-  if (Array.isArray(recipients)) {
-    return recipients.map((r) => String(r).trim()).filter(Boolean);
-  }
-  if (typeof recipients === "string") {
-    return recipients
-      .split(/\r?\n|,|;/)
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
-  return [];
+  return flattenRecipientInput(recipients)
+    .map((r) => String(r).trim())
+    .filter(Boolean);
 }
 
 function extractToken(req) {

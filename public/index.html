@@ -61,7 +61,7 @@
               <div>
                 <label class="block text-sm font-medium text-slate-600">From name</label>
                 <input type="text" x-model.trim="form.fromName" placeholder="Marketing Team" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
-                <p class="text-xs text-slate-400 mt-1">Set the display name.</p>
+                <p class="text-xs text-slate-400 mt-1">Set the display name <small>(This is what your recievers will see as the name that sent.)</small>.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-slate-600">Reply-To (optional)</label>
@@ -72,11 +72,17 @@
                 <input type="text" x-model.trim="form.subject" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
               </div>
               <div>
-                <label class="block text-sm font-medium text-slate-600">Recipients</label>
-                <textarea rows="2" x-model="form.recipients" placeholder="one@example.com, two@example.com" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required></textarea>
+                <label class="block text-sm font-medium text-slate-600">BCC/ Recipients</label>
+                <textarea
+                  rows="2"
+                  x-model="form.recipients"
+                  placeholder="one@example.com two@example.com three@example.com"
+                  class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
+                  required></textarea>
+                <p class="text-xs text-slate-400 mt-1">Separate addresses with spaces, commas, semicolons, or new lines.</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-slate-600">HTML body</label>
+                <label class="block text-sm font-medium text-slate-600">HTML body/ Plain Text</label>
                 <textarea
                   rows="10"
                   dir="ltr"
@@ -84,7 +90,7 @@
                   placeholder="Write or paste your HTML email here"
                   class="mt-1 w-full rounded border border-slate-300 px-3 py-3 focus:outline-none focus:ring focus:ring-indigo-200 font-mono text-sm"
                   style="min-height: 220px;"></textarea>
-                <p class="text-xs text-slate-400 mt-1">Emails will send using this HTML content; a plain text copy is generated automatically.</p>
+                <p class="text-xs text-slate-400 mt-1">Drop your HTML template or plain text here.</p>
               </div>
               <button type="submit" class="self-start bg-indigo-600 text-white font-medium px-6 py-2 rounded hover:bg-indigo-500" x-bind:disabled="busy">
                 Save job
