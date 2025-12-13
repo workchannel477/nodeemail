@@ -672,7 +672,7 @@ document.addEventListener('alpine:init', () => {
         
         // Clear form
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-        this.message = 'Job queued and sending now.';
+        this.message = 'Job saved. Use the Send action when you are ready to deliver it.';
         
         setTimeout(() => {
           this.message = '';

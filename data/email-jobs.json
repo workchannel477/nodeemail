@@ -108,6 +108,32 @@
       },
       "sentCount": 2,
       "failedCount": 0
+    },
+    {
+      "id": "13e45d26-2940-405c-8fa1-9b29e1d7fb7c",
+      "owner": "admin",
+      "subject": "Join",
+      "fromName": "Market",
+      "textBody": "",
+      "htmlBody": "Hi, testing",
+      "recipientsCount": 1,
+      "recipientsPreview": [
+        "workloadx@gmail.com"
+      ],
+      "batchSize": 50,
+      "delayBetweenBatches": 2,
+      "maxRetries": 3,
+      "status": "sent",
+      "createdAt": "2025-12-13T07:33:46.995Z",
+      "updatedAt": "2025-12-13T07:34:01.418Z",
+      "lastSentAt": "2025-12-13T07:34:01.418Z",
+      "lastResult": {
+        "sent": 1,
+        "failed": 0,
+        "batches": 1
+      },
+      "sentCount": 1,
+      "failedCount": 0
     }
   ]
 }

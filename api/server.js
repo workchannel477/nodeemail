@@ -29,7 +29,7 @@ const rateLimitFilePath = path.join(dataDir, "rate-limit.json");
 const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_MINUTE = parseInt(process.env.MAX_REQUESTS_PER_MINUTE || "60", 10);
@@ -641,12 +641,6 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   payload.jobs.push(job);
   await writeJson(jobsFilePath, payload);
   await saveRecipients(job.id, recipientList);
-  // Kick off sending immediately in the background
-  setImmediate(() => {
-    dispatchJob(job, payload).catch((err) => {
-      console.error("Auto-dispatch failed for job", job.id, err.message);
-    });
-  });
   res.status(201).json(job);
 });
 

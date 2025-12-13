@@ -111,7 +111,7 @@ document.addEventListener('alpine:init', () => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Failed to create job');
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-        this.message = 'Job queued and sending now.';
+        this.message = 'Job saved. Use Send in the actions column when ready.';
         setTimeout(() => (this.message = ''), 4000);
         await Promise.all([this.fetchJobs(), this.refreshProfile()]);
       } catch (error) {

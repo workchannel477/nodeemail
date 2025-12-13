@@ -95,6 +95,7 @@
               <button type="submit" class="self-start bg-indigo-600 text-white font-medium px-6 py-2 rounded hover:bg-indigo-500" x-bind:disabled="busy">
                 Save job
               </button>
+              <p class="text-xs text-slate-400">Jobs stay pending until you trigger Send from the table.</p>
               <p class="text-sm text-green-600" x-text="message" x-show="message"></p>
               <p class="text-sm text-red-600" x-text="error" x-show="error"></p>
             </form>
@@ -151,7 +152,7 @@
                       <td class="py-2 pr-4 flex gap-2 flex-wrap">
                         <button class="px-3 py-1 bg-emerald-500 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
                                 @click="triggerSend(job.id)"
-                                :disabled="job.status === 'sending'">Send</button>
+                                :disabled="(job.status === 'sending' || job.status === 'sent')">Send</button>
                         <button class="px-3 py-1 bg-rose-500 text-white rounded" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
                       </td>
                     </tr>

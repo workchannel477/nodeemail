@@ -673,7 +673,7 @@ document.addEventListener('alpine:init', () => {
         
         // Clear form
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-        this.message = 'Job created successfully!';
+        this.message = 'Job saved. Use the Send action to dispatch it when ready.';
         
         setTimeout(() => {
           this.message = '';

@@ -491,7 +491,7 @@ http://host:port"></textarea>
                       <td class="px-6 py-4">
                         <div class="max-w-xs truncate" x-text="job.subject"></div>
                       </td>
-                      <td class="px-6 py-4 whitespace-nowrap" x-text="job.from || '-'"></td>
+                      <td class="px-6 py-4 whitespace-nowrap" x-text="(job.fromName || job.from || '-')"></td>
                       <td class="px-6 py-4 whitespace-nowrap" x-text="job.owner"></td>
                       <td class="px-6 py-4">
                         <div class="max-w-xs truncate" x-text="(job.recipientsPreview || job.recipients || []).join(', ')"></div>
