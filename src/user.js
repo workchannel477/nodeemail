@@ -5,9 +5,16 @@ document.addEventListener('alpine:init', () => {
     token: localStorage.getItem('mailer_token') || '',
     user: JSON.parse(localStorage.getItem('mailer_user') || 'null'),
     jobs: [],
+    activity: [],
     busy: false,
     message: '',
     error: '',
+    activityError: '',
+    activityBusy: false,
+    activeTab: 'jobs',
+    editingJobId: null,
+    editingJobSubject: '',
+    recipientsBusy: false,
     loginForm: { username: '', password: '' },
     form: {
       fromName: '',
@@ -20,6 +27,7 @@ document.addEventListener('alpine:init', () => {
       if (this.token) {
         this.fetchJobs();
         this.refreshProfile();
+        this.loadActivity();
       }
     },
     get isAdmin() {
@@ -47,6 +55,7 @@ document.addEventListener('alpine:init', () => {
         localStorage.setItem('mailer_user', JSON.stringify(this.user));
         this.loginForm.password = '';
         await this.fetchJobs();
+        await this.loadActivity(true);
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -66,6 +75,13 @@ document.addEventListener('alpine:init', () => {
       this.token = '';
       this.user = null;
       this.jobs = [];
+      this.activity = [];
+      this.activityError = '';
+      this.activityBusy = false;
+      this.activeTab = 'jobs';
+      this.editingJobId = null;
+      this.editingJobSubject = '';
+      this.recipientsBusy = false;
     },
     async refreshProfile() {
       if (!this.token) return;
@@ -90,6 +106,56 @@ document.addEventListener('alpine:init', () => {
         this.error = error.message;
       }
     },
+    async loadActivity(force = false) {
+      if (!this.token) return;
+      if (this.activity.length && !force) return;
+      this.activityError = '';
+      this.activityBusy = true;
+      try {
+        const response = await fetch(apiUrl('/api/activity'), { headers: this.headers() });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Unable to load activity log');
+        this.activity = Array.isArray(data) ? data : [];
+      } catch (error) {
+        this.activityError = error.message;
+      } finally {
+        this.activityBusy = false;
+      }
+    },
+    setTab(tab) {
+      this.activeTab = tab;
+      if (tab === 'activity' && !this.activity.length) {
+        this.loadActivity(true);
+      }
+    },
+    async editJob(job) {
+      if (this.recipientsBusy) return;
+      this.error = '';
+      this.recipientsBusy = true;
+      try {
+        const response = await fetch(apiUrl(`/api/jobs/${job.id}/recipients`), { headers: this.headers() });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Unable to load recipients');
+        const recipients = Array.isArray(data.recipients) ? data.recipients.join('\n') : '';
+        this.form.fromName = job.fromName || '';
+        this.form.replyTo = job.replyTo || '';
+        this.form.subject = job.subject || '';
+        this.form.recipients = recipients;
+        this.form.htmlBody = job.htmlBody || '';
+        this.editingJobId = job.id;
+        this.editingJobSubject = job.subject;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error) {
+        this.error = error.message;
+      } finally {
+        this.recipientsBusy = false;
+      }
+    },
+    cancelEdit() {
+      this.editingJobId = null;
+      this.editingJobSubject = '';
+      Object.keys(this.form).forEach((key) => (this.form[key] = ''));
+    },
     async createJob() {
       this.error = '';
       this.message = '';
@@ -103,17 +169,22 @@ document.addEventListener('alpine:init', () => {
       }
       this.busy = true;
       try {
-        const response = await fetch(apiUrl('/api/jobs'), {
-          method: 'POST',
+        const method = this.editingJobId ? 'PUT' : 'POST';
+        const url = this.editingJobId ? `/api/jobs/${this.editingJobId}` : '/api/jobs';
+        const response = await fetch(apiUrl(url), {
+          method,
           headers: this.headers(),
           body: JSON.stringify(this.form)
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to create job');
+        if (!response.ok) throw new Error(data.message || `Failed to ${this.editingJobId ? 'update' : 'create'} job`);
+        const wasEditing = Boolean(this.editingJobId);
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-        this.message = 'Job saved. Use Send in the actions column when ready.';
+        this.editingJobId = null;
+        this.editingJobSubject = '';
+        this.message = wasEditing ? 'Job updated. Use Send in the actions column when ready.' : 'Job saved. Use Send in the actions column when ready.';
         setTimeout(() => (this.message = ''), 4000);
-        await Promise.all([this.fetchJobs(), this.refreshProfile()]);
+        await Promise.all([this.fetchJobs(), this.refreshProfile(), this.loadActivity(true)]);
       } catch (error) {
         this.error = error.message;
       } finally {
@@ -131,10 +202,13 @@ document.addEventListener('alpine:init', () => {
         if (!response.ok) throw new Error(data.message || 'Failed to send job');
         this.message = data.message;
         setTimeout(() => (this.message = ''), 4000);
-        await this.fetchJobs();
+        await Promise.all([this.fetchJobs(), this.loadActivity(true)]);
       } catch (error) {
         this.error = error.message;
       }
+    },
+    retryJob(id) {
+      return this.triggerSend(id);
     },
     async deleteJob(id) {
       if (!confirm('Delete this job?')) return;
@@ -147,7 +221,7 @@ document.addEventListener('alpine:init', () => {
         if (!response.ok) throw new Error(data.message || 'Failed to delete job');
         this.message = data.message;
         setTimeout(() => (this.message = ''), 4000);
-        await this.fetchJobs();
+        await Promise.all([this.fetchJobs(), this.loadActivity(true)]);
       } catch (error) {
         this.error = error.message;
       }

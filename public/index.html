@@ -58,6 +58,15 @@
               <span class="text-sm text-slate-400" x-show="busy">Working...</span>
             </div>
             <form class="grid gap-4" @submit.prevent="createJob">
+              <div
+                class="flex items-center justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700"
+                x-show="editingJobId">
+                <div>
+                  Editing <span class="font-semibold" x-text="editingJobSubject || 'selected job'"></span>. Updates will
+                  overwrite the saved job.
+                </div>
+                <button type="button" class="text-xs font-semibold uppercase text-amber-800" @click="cancelEdit">Cancel</button>
+              </div>
               <div>
                 <label class="block text-sm font-medium text-slate-600">From name</label>
                 <input type="text" x-model.trim="form.fromName" placeholder="Marketing Team" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
@@ -79,7 +88,7 @@
                   placeholder="one@example.com two@example.com three@example.com"
                   class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"
                   required></textarea>
-                <p class="text-xs text-slate-400 mt-1">Separate addresses with spaces, commas, semicolons, or new lines.</p>
+                <p class="text-xs text-slate-400 mt-1">Separate addresses with spaces, commas, semicolons, or new lines. Addresses are converted to lowercase automatically.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-slate-600">HTML body/ Plain Text</label>
@@ -92,9 +101,15 @@
                   style="min-height: 220px;"></textarea>
                 <p class="text-xs text-slate-400 mt-1">Drop your HTML template or plain text here.</p>
               </div>
-              <button type="submit" class="self-start bg-indigo-600 text-white font-medium px-6 py-2 rounded hover:bg-indigo-500" x-bind:disabled="busy">
-                Save job
-              </button>
+              <div class="flex items-center gap-3 flex-wrap">
+                <button type="submit" class="self-start bg-indigo-600 text-white font-medium px-6 py-2 rounded hover:bg-indigo-500 disabled:opacity-60" x-bind:disabled="busy || recipientsBusy">
+                  <span x-text="editingJobId ? 'Update job' : 'Save job'"></span>
+                </button>
+                <button type="button" class="text-sm text-slate-500 underline decoration-dotted" x-show="editingJobId" @click="cancelEdit">
+                  Cancel edit
+                </button>
+                <span class="text-xs text-slate-400" x-show="recipientsBusy">Loading recipients...</span>
+              </div>
               <p class="text-xs text-slate-400">Jobs stay pending until you trigger Send from the table.</p>
               <p class="text-sm text-green-600" x-text="message" x-show="message"></p>
               <p class="text-sm text-red-600" x-text="error" x-show="error"></p>
@@ -102,64 +117,120 @@
           </section>
 
           <section class="bg-white shadow rounded-lg p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold text-slate-700">Existing jobs</h2>
-              <button class="text-sm text-indigo-600" @click="fetchJobs">Reload</button>
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+              <div>
+                <h2 class="text-xl font-semibold text-slate-700">Sent messages</h2>
+                <p class="text-sm text-slate-500">Manage pending jobs or review delivery activity.</p>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <button class="rounded-full border px-3 py-1 text-sm font-medium"
+                        :class="activeTab === 'jobs' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-300'"
+                        @click="setTab('jobs')">Jobs</button>
+                <button class="rounded-full border px-3 py-1 text-sm font-medium"
+                        :class="activeTab === 'activity' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-300'"
+                        @click="setTab('activity')">Activity</button>
+                <button class="text-sm text-indigo-600" @click="activeTab === 'jobs' ? fetchJobs() : loadActivity(true)">Reload</button>
+              </div>
             </div>
-            <template x-if="!jobs.length">
-              <p class="text-slate-500">No jobs yet. Submit the form above to create one.</p>
+            <template x-if="activeTab === 'jobs'">
+              <div>
+                <template x-if="!jobs.length">
+                  <p class="text-slate-500">No jobs yet. Submit the form above to create one.</p>
+                </template>
+                <div class="overflow-x-auto" x-show="jobs.length">
+                  <table class="min-w-full text-sm">
+                    <thead>
+                      <tr class="text-left text-slate-500 border-b">
+                        <th class="py-2 pr-4">Subject</th>
+                        <th class="py-2 pr-4">From</th>
+                        <th class="py-2 pr-4">Recipients</th>
+                        <th class="py-2 pr-4">Status</th>
+                        <th class="py-2 pr-4">Summary</th>
+                        <th class="py-2 pr-4">Owner</th>
+                        <th class="py-2 pr-4">Updated</th>
+                        <th class="py-2 pr-4">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="job in jobs" :key="job.id">
+                        <tr class="border-b last:border-b-0 align-top">
+                          <td class="py-2 pr-4 font-medium text-slate-700" x-text="job.subject"></td>
+                          <td class="py-2 pr-4 text-slate-500">
+                            <span x-text="job.fromName || job.from || 'Admin default'"></span>
+                          </td>
+                          <td class="py-2 pr-4 text-slate-500">
+                            <span x-text="(job.recipientsPreview || job.recipients || []).join(', ')"></span>
+                            <span class="text-xs text-slate-400" x-text="job.recipientsCount ? `(${job.recipientsCount} total)` : ''"></span>
+                          </td>
+                          <td class="py-2 pr-4">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
+                                  :class="{
+                                    'bg-green-100 text-green-700': job.status === 'sent',
+                                    'bg-yellow-100 text-yellow-700': job.status === 'pending',
+                                    'bg-red-100 text-red-700': job.status === 'failed',
+                                    'bg-blue-100 text-blue-700': job.status === 'sending'
+                                  }">
+                              <span class="mr-1">&#9679;</span>
+                              <span x-text="job.status"></span>
+                            </span>
+                          </td>
+                          <td class="py-2 pr-4 text-slate-600">
+                            <div x-text="formatJobSummary(job)"></div>
+                            <p class="text-xs text-rose-500" x-show="job.error" x-text="job.error"></p>
+                          </td>
+                          <td class="py-2 pr-4 text-slate-500" x-text="job.owner"></td>
+                          <td class="py-2 pr-4 text-slate-500" x-text="formatDate(job.updatedAt)"></td>
+                          <td class="py-2 pr-4 flex gap-2 flex-wrap">
+                            <button class="px-3 py-1 bg-emerald-500 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                                    @click="triggerSend(job.id)"
+                                    :disabled="(job.status === 'sending' || job.status === 'sent')">Send</button>
+                            <button class="px-3 py-1 bg-amber-500 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                                    x-show="job.status === 'failed'"
+                                    @click="retryJob(job.id)">
+                              Retry
+                            </button>
+                            <button class="px-3 py-1 bg-slate-600 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                                    @click="editJob(job)"
+                                    :disabled="recipientsBusy || job.status === 'sending'">
+                              Edit
+                            </button>
+                            <button class="px-3 py-1 bg-rose-500 text-white rounded" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </template>
-            <div class="overflow-x-auto" x-show="jobs.length">
-              <table class="min-w-full text-sm">
-                <thead>
-                  <tr class="text-left text-slate-500 border-b">
-                    <th class="py-2 pr-4">Subject</th>
-                    <th class="py-2 pr-4">From</th>
-                    <th class="py-2 pr-4">Recipients</th>
-                    <th class="py-2 pr-4">Status</th>
-                    <th class="py-2 pr-4">Summary</th>
-                    <th class="py-2 pr-4">Owner</th>
-                    <th class="py-2 pr-4">Updated</th>
-                    <th class="py-2 pr-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="job in jobs" :key="job.id">
-                    <tr class="border-b last:border-b-0">
-                      <td class="py-2 pr-4 font-medium text-slate-700" x-text="job.subject"></td>
-                      <td class="py-2 pr-4 text-slate-500">
-                        <span x-text="job.fromName || job.from || 'Admin default'"></span>
-                      </td>
-                      <td class="py-2 pr-4 text-slate-500">
-                        <span x-text="(job.recipientsPreview || job.recipients || []).join(', ')"></span>
-                        <span class="text-xs text-slate-400" x-text="job.recipientsCount ? `(${job.recipientsCount} total)` : ''"></span>
-                      </td>
-                      <td class="py-2 pr-4">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
-                              :class="{
-                                'bg-green-100 text-green-700': job.status === 'sent',
-                                'bg-yellow-100 text-yellow-700': job.status === 'pending',
-                                'bg-red-100 text-red-700': job.status === 'failed',
-                                'bg-blue-100 text-blue-700': job.status === 'sending'
-                              }">
+            <template x-if="activeTab === 'activity'">
+              <div>
+                <div class="text-sm text-slate-500 mb-3" x-show="activityBusy">Loading activity...</div>
+                <p class="text-sm text-red-600" x-show="activityError" x-text="activityError"></p>
+                <template x-if="!activityBusy && !activity.length && !activityError">
+                  <p class="text-slate-500">No activity recorded yet.</p>
+                </template>
+                <div class="space-y-3" x-show="activity.length">
+                  <template x-for="entry in activity" :key="entry.id">
+                    <div class="rounded border border-slate-200 p-3">
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p class="font-medium text-slate-700" x-text="entry.subject || 'Untitled job'"></p>
+                          <p class="text-xs text-slate-500" x-text="formatDate(entry.timestamp)"></p>
+                        </div>
+                        <span class="inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide"
+                              :class="entry.status === 'sent' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'">
                           <span class="mr-1">&#9679;</span>
-                          <span x-text="job.status"></span>
+                          <span x-text="entry.status"></span>
                         </span>
-                      </td>
-                      <td class="py-2 pr-4 text-slate-600" x-text="formatJobSummary(job)"></td>
-                      <td class="py-2 pr-4 text-slate-500" x-text="job.owner"></td>
-                      <td class="py-2 pr-4 text-slate-500" x-text="formatDate(job.updatedAt)"></td>
-                      <td class="py-2 pr-4 flex gap-2 flex-wrap">
-                        <button class="px-3 py-1 bg-emerald-500 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
-                                @click="triggerSend(job.id)"
-                                :disabled="(job.status === 'sending' || job.status === 'sent')">Send</button>
-                        <button class="px-3 py-1 bg-rose-500 text-white rounded" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
-                      </td>
-                    </tr>
+                      </div>
+                      <p class="text-sm text-slate-600 mt-2" x-text="entry.message || 'No additional details'"></p>
+                      <p class="text-xs text-slate-400 mt-1" x-text="`Sent ${entry.sent}/${entry.recipientsCount || entry.sent + entry.failed || 0} · Failed ${entry.failed}`"></p>
+                    </div>
                   </template>
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </div>
+            </template>
           </section>
 
         </div>

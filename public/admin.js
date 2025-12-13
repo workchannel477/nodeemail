@@ -1,9 +1,9 @@
 const apiUrl = (path) => (window.API ? window.API.url(path) : path);
 const apiFetch = (path, options) => fetch(apiUrl(path), options);
+const valueOr = (value, fallback) => (value === undefined || value === null ? fallback : value);
 
-document.addEventListener('alpine:init', () => {
-  // Admin App
-  Alpine.data('adminApp', () => ({
+// Admin App (admin.html)
+const adminAppDefinition = () => ({
     // State
     token: localStorage.getItem('mailer_token') || '',
     user: JSON.parse(localStorage.getItem('mailer_user') || 'null'),
@@ -27,6 +27,7 @@ document.addEventListener('alpine:init', () => {
     showChangePasswordModal: false,
     showEditUserModal: false,
     activeTab: 'all',
+    dataSync: { message: '', push: true, busy: false, status: '', error: '' },
     
     // Computed
     get filteredJobs() {
@@ -38,7 +39,7 @@ document.addEventListener('alpine:init', () => {
     async init() {
       this.isReady = true;
       if (this.token) {
-        if (this.user?.role !== 'admin') {
+        if (!this.user || this.user.role !== 'admin') {
           this.error = 'Current session is not an admin. Please sign in with an admin account.';
           this.logout();
           return;
@@ -75,7 +76,7 @@ document.addEventListener('alpine:init', () => {
         if (data.role !== 'admin') throw new Error('Admin role required');
         
         this.token = data.token;
-        this.user = data;
+      this.user = data;
         localStorage.setItem('mailer_token', data.token);
         localStorage.setItem('mailer_user', JSON.stringify(data));
         this.loginForm.password = '';
@@ -132,7 +133,7 @@ document.addEventListener('alpine:init', () => {
         if (response.ok) {
           const data = await response.json();
           this.ipRotation = data;
-          this.ipForm.proxies = data.proxies?.join('\n') || '';
+      this.ipForm.proxies = (data.proxies || []).join('\n') || '';
         }
       } catch (error) {
         console.error('Failed to load IP rotation:', error);
@@ -502,9 +503,9 @@ document.addEventListener('alpine:init', () => {
     },
     
     formatJobSummary(job) {
-      const sent = job.sentCount ?? (job.lastResult && job.lastResult.sent) ?? 0;
-      const failed = job.failedCount ?? (job.lastResult && job.lastResult.failed) ?? 0;
-      const total = job.recipientsCount ?? (job.recipients || []).length;
+      const sent = valueOr(job.sentCount, valueOr(job.lastResult ? job.lastResult.sent : undefined, 0));
+      const failed = valueOr(job.failedCount, valueOr(job.lastResult ? job.lastResult.failed : undefined, 0));
+      const total = valueOr(job.recipientsCount, (job.recipients || []).length);
       const parts = [`${sent}/${total || '?'} sent`];
       if (failed) parts.push(`${failed} failed`);
       if (job.status === 'sending') parts.push('sending...');
@@ -517,18 +518,52 @@ document.addEventListener('alpine:init', () => {
     
     openUserPanel() {
       window.location.href = '/index.html';
-    }
-  }));
+    },
 
-  // User App
-  Alpine.data('dashboardApp', () => ({
-    // State
+    async syncDataRepo() {
+      this.dataSync.error = '';
+      this.dataSync.status = '';
+      this.dataSync.busy = true;
+      try {
+        const response = await apiFetch('/admin/data-sync', {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({
+            message: this.dataSync.message,
+            push: this.dataSync.push
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to sync data');
+        }
+        this.dataSync.status = data.message || 'Data sync completed.';
+        if (this.dataSync.push === false) {
+          this.dataSync.status += ' (Not pushed)';
+        }
+      } catch (error) {
+        this.dataSync.error = error.message;
+      } finally {
+        this.dataSync.busy = false;
+      }
+    }
+  });
+
+// User App (index.html)
+const dashboardAppDefinition = () => ({
     token: localStorage.getItem('mailer_token') || '',
     user: JSON.parse(localStorage.getItem('mailer_user') || 'null'),
     jobs: [],
+    activity: [],
     busy: false,
     message: '',
     error: '',
+    activityError: '',
+    activityBusy: false,
+    activeTab: 'jobs',
+    editingJobId: null,
+    editingJobSubject: '',
+    recipientsBusy: false,
     loginForm: { username: '', password: '' },
     form: {
       fromName: '',
@@ -537,26 +572,21 @@ document.addEventListener('alpine:init', () => {
       recipients: '',
       htmlBody: ''
     },
-    
-    // Computed
     get isAdmin() {
-      return this.user?.role === 'admin';
+      return this.user && this.user.role === 'admin';
     },
-    
-    // Methods
     async init() {
       if (this.token) {
         await this.fetchJobs();
         await this.refreshProfile();
+        await this.loadActivity();
       }
     },
-    
     headers() {
       const headers = { 'Content-Type': 'application/json' };
       if (this.token) headers.Authorization = `Bearer ${this.token}`;
       return headers;
     },
-    
     async login() {
       this.error = '';
       this.busy = true;
@@ -566,39 +596,27 @@ document.addEventListener('alpine:init', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.loginForm)
         });
-        
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || 'Invalid credentials');
         }
-        
         const data = await response.json();
-        
-        // Check if user is suspended
         if (data.status === 'suspended') {
           throw new Error('Your account has been suspended. Please contact an administrator.');
         }
-        
         this.token = data.token;
-        this.user = { 
-          username: data.username, 
-          role: data.role, 
-          mailboxes: data.mailboxes || [],
-          status: data.status 
-        };
-        
+        this.user = { username: data.username, role: data.role, mailboxes: data.mailboxes || [], status: data.status };
         localStorage.setItem('mailer_token', this.token);
         localStorage.setItem('mailer_user', JSON.stringify(this.user));
         this.loginForm.password = '';
-        
         await this.fetchJobs();
+        await this.loadActivity(true);
       } catch (error) {
         this.error = error.message;
       } finally {
         this.busy = false;
       }
     },
-    
     async logout() {
       if (this.token) {
         try {
@@ -612,8 +630,14 @@ document.addEventListener('alpine:init', () => {
       this.token = '';
       this.user = null;
       this.jobs = [];
+      this.activity = [];
+      this.activityError = '';
+      this.activityBusy = false;
+      this.activeTab = 'jobs';
+      this.editingJobId = null;
+      this.editingJobSubject = '';
+      this.recipientsBusy = false;
     },
-    
     async refreshProfile() {
       if (!this.token) return;
       try {
@@ -626,7 +650,6 @@ document.addEventListener('alpine:init', () => {
         this.error = error.message;
       }
     },
-    
     async fetchJobs() {
       if (!this.token) return;
       this.error = '';
@@ -641,12 +664,59 @@ document.addEventListener('alpine:init', () => {
         this.busy = false;
       }
     },
-    
+    async loadActivity(force = false) {
+      if (!this.token) return;
+      if (this.activity.length && !force) return;
+      this.activityError = '';
+      this.activityBusy = true;
+      try {
+        const response = await apiFetch('/api/activity', { headers: this.headers() });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Unable to load activity log');
+        this.activity = Array.isArray(data) ? data : [];
+      } catch (error) {
+        this.activityError = error.message;
+      } finally {
+        this.activityBusy = false;
+      }
+    },
+    setTab(tab) {
+      this.activeTab = tab;
+      if (tab === 'activity' && !this.activity.length) {
+        this.loadActivity(true);
+      }
+    },
+    async editJob(job) {
+      if (this.recipientsBusy) return;
+      this.error = '';
+      this.recipientsBusy = true;
+      try {
+        const response = await apiFetch(`/api/jobs/${job.id}/recipients`, { headers: this.headers() });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Unable to load recipients');
+        const recipients = Array.isArray(data.recipients) ? data.recipients.join('\n') : '';
+        this.form.fromName = job.fromName || '';
+        this.form.replyTo = job.replyTo || '';
+        this.form.subject = job.subject || '';
+        this.form.recipients = recipients;
+        this.form.htmlBody = job.htmlBody || '';
+        this.editingJobId = job.id;
+        this.editingJobSubject = job.subject;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error) {
+        this.error = error.message;
+      } finally {
+        this.recipientsBusy = false;
+      }
+    },
+    cancelEdit() {
+      this.editingJobId = null;
+      this.editingJobSubject = '';
+      Object.keys(this.form).forEach((key) => (this.form[key] = ''));
+    },
     async createJob() {
       this.error = '';
       this.message = '';
-      
-      // Validate required fields
       if (!this.form.fromName || !this.form.subject || !this.form.recipients) {
         this.error = 'From name, subject, and recipients are required.';
         return;
@@ -655,93 +725,70 @@ document.addEventListener('alpine:init', () => {
         this.error = 'HTML body is required.';
         return;
       }
-      
       this.busy = true;
       try {
-        const response = await apiFetch('/api/jobs', {
-          method: 'POST',
+        const wasEditing = Boolean(this.editingJobId);
+        const url = this.editingJobId ? `/api/jobs/${this.editingJobId}` : '/api/jobs';
+        const response = await apiFetch(url, {
+          method: this.editingJobId ? 'PUT' : 'POST',
           headers: this.headers(),
           body: JSON.stringify(this.form)
         });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to create job');
-        }
-        
         const data = await response.json();
-        
-        // Clear form
+        if (!response.ok) throw new Error(data.message || `Failed to ${wasEditing ? 'update' : 'create'} job`);
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-        this.message = 'Job saved. Use the Send action to dispatch it when ready.';
-        
+        this.editingJobId = null;
+        this.editingJobSubject = '';
+        this.message = wasEditing ? 'Job updated. Use Send in the actions column when ready.' : 'Job saved. Use Send in the actions column when ready.';
         setTimeout(() => {
           this.message = '';
         }, 4000);
-        
-        // Refresh data
-        await Promise.all([this.fetchJobs(), this.refreshProfile()]);
+        await Promise.all([this.fetchJobs(), this.refreshProfile(), this.loadActivity(true)]);
       } catch (error) {
         this.error = error.message;
       } finally {
         this.busy = false;
       }
     },
-    
     async triggerSend(id) {
       if (!confirm('Send this email job now?')) return;
-      
       try {
         const response = await apiFetch(`/api/jobs/${id}/send`, {
           method: 'POST',
           headers: this.headers()
         });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to send job');
-        }
-        
         const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to send job');
         this.message = data.message;
-        
         setTimeout(() => {
           this.message = '';
         }, 4000);
-        
-        await this.fetchJobs();
+        await Promise.all([this.fetchJobs(), this.loadActivity(true)]);
       } catch (error) {
         this.error = error.message;
       }
     },
-    
+    retryJob(id) {
+      return this.triggerSend(id);
+    },
     async deleteJob(id) {
       if (!confirm('Delete this job?')) return;
-      
       try {
         const response = await apiFetch(`/api/jobs/${id}`, {
           method: 'DELETE',
           headers: this.headers()
         });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to delete job');
-        }
-        
         const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to delete job');
         this.message = data.message;
-        
         setTimeout(() => {
           this.message = '';
         }, 4000);
-        
-        await this.fetchJobs();
+        await Promise.all([this.fetchJobs(), this.loadActivity(true)]);
       } catch (error) {
         this.error = error.message;
       }
     },
-    
     formatDate(value) {
       if (!value) return '-';
       try {
@@ -750,9 +797,24 @@ document.addEventListener('alpine:init', () => {
         return value;
       }
     },
-    
+    formatJobSummary(job) {
+      const sent = valueOr(job.sentCount, valueOr(job.lastResult ? job.lastResult.sent : undefined, 0));
+      const failed = valueOr(job.failedCount, valueOr(job.lastResult ? job.lastResult.failed : undefined, 0));
+      const total = valueOr(job.recipientsCount, job.recipients ? job.recipients.length : 0);
+      const parts = [`${sent}/${total || '?'} sent`];
+      if (failed) parts.push(`${failed} failed`);
+      if (job.status === 'sending') parts.push('sending...');
+      return parts.join(' · ');
+    },
     openAdmin() {
       window.location.href = '/admin.html';
     }
-  }));
+  });
+
+document.addEventListener('alpine:init', () => {
+  Alpine.data('adminApp', adminAppDefinition);
+  Alpine.data('dashboardApp', dashboardAppDefinition);
 });
+
+window.adminApp = adminAppDefinition;
+window.dashboardApp = dashboardAppDefinition;

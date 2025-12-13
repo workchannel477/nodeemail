@@ -10,6 +10,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import nodemailer from "nodemailer";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { createHash } from "crypto";
+import { execSync } from "child_process";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -27,6 +28,7 @@ const jobsFilePath = path.join(dataDir, "email-jobs.json");
 const ipRotationFilePath = path.join(dataDir, "ip-rotation.json");
 const rateLimitFilePath = path.join(dataDir, "rate-limit.json");
 const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
+const activityLogPath = path.join(dataDir, "activity-log.json");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -36,6 +38,7 @@ const MAX_REQUESTS_PER_MINUTE = parseInt(process.env.MAX_REQUESTS_PER_MINUTE || 
 const EMAIL_RATE_LIMIT = parseInt(process.env.MAX_EMAILS_PER_MINUTE || "10", 10);
 const BATCH_SIZE_DEFAULT = parseInt(process.env.EMAIL_BATCH_SIZE || "50", 10);
 const SMTP_ROTATE_AFTER_DEFAULT = 200;
+const DATA_SYNC_DEFAULT_MESSAGE = "chore: sync data folder";
 
 const sessions = new Map();
 const apiRate = new Map();
@@ -101,6 +104,9 @@ async function ensureDataFiles() {
       rotateAfter: SMTP_ROTATE_AFTER_DEFAULT,
       updatedAt: new Date().toISOString(),
     });
+  }
+  if (!(await fs.pathExists(activityLogPath))) {
+    await fs.writeJson(activityLogPath, { entries: [] });
   }
 }
 
@@ -178,8 +184,83 @@ function flattenRecipientInput(value) {
 
 function normalizeRecipients(recipients = []) {
   return flattenRecipientInput(recipients)
-    .map((r) => String(r).trim())
+    .map((r) => String(r).trim().toLowerCase())
     .filter(Boolean);
+}
+
+async function readActivityLog() {
+  return readJson(activityLogPath, { entries: [] });
+}
+
+async function appendActivityLog(entry) {
+  const payload = await readActivityLog();
+  payload.entries = payload.entries || [];
+  payload.entries.unshift(entry);
+  if (payload.entries.length > 200) {
+    payload.entries = payload.entries.slice(0, 200);
+  }
+  await writeJson(activityLogPath, payload);
+}
+
+function extractResultError(result = {}) {
+  if (!Array.isArray(result.results)) return null;
+  const failed = result.results.find((batch) => batch && batch.error);
+  if (failed && failed.error) return failed.error;
+  const failedCounts = result.results.find((batch) => batch && batch.failed > 0);
+  if (failedCounts) {
+    return `Failed to send to ${failedCounts.failed} recipient(s)`;
+  }
+  return null;
+}
+
+function summarizeSend(job, result) {
+  const total = job.recipientsCount || (result ? (result.sent || 0) + (result.failed || 0) : 0);
+  return `Sent ${result?.sent || 0}/${total || 0} emails`;
+}
+
+async function recordActivity(job, result, errorMessage) {
+  const summaryMessage = errorMessage || extractResultError(result) || summarizeSend(job, result);
+  const entry = {
+    id: uuid(),
+    jobId: job.id,
+    owner: job.owner,
+    subject: job.subject,
+    status: errorMessage ? "failed" : result?.success ? "sent" : "failed",
+    sent: result?.sent || 0,
+    failed: result?.failed || 0,
+    recipientsCount: job.recipientsCount || 0,
+    message: summaryMessage,
+    timestamp: new Date().toISOString(),
+  };
+  await appendActivityLog(entry);
+}
+
+function gitStatusForData() {
+  return execSync("git status --porcelain data", {
+    cwd: rootDir,
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+    .toString()
+    .trim();
+}
+
+function syncDataRepo({ message, push }) {
+  const status = gitStatusForData();
+  if (!status) {
+    return { changed: false, pushed: false };
+  }
+  execSync("git add data", { cwd: rootDir, stdio: ["ignore", "pipe", "pipe"] });
+  const commitMessage = String(message || "").trim() || DATA_SYNC_DEFAULT_MESSAGE;
+  execSync(`git commit -m ${JSON.stringify(commitMessage)}`, {
+    cwd: rootDir,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let pushed = false;
+  if (push) {
+    execSync("git push", { cwd: rootDir, stdio: ["ignore", "pipe", "pipe"] });
+    pushed = true;
+  }
+  return { changed: true, pushed, commitMessage };
 }
 
 function extractToken(req) {
@@ -580,6 +661,19 @@ app.post("/admin/rate-limits/reset", requireAuth, requireAdmin, async (req, res)
   res.json({ message: "Rate limits reset successfully" });
 });
 
+app.post("/admin/data-sync", requireAuth, requireAdmin, async (req, res) => {
+  const { message = "", push = true } = req.body || {};
+  try {
+    const result = syncDataRepo({ message, push: push !== false });
+    const text = result.changed
+      ? `Data committed${result.pushed ? " and pushed" : ""}.`
+      : "No changes detected.";
+    res.json({ message: text, ...result });
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Failed to sync data" });
+  }
+});
+
 // ---------- Jobs ----------
 app.get("/api/jobs", requireAuth, async (req, res) => {
   const { jobs = [] } = await readJson(jobsFilePath, { jobs: [] });
@@ -590,6 +684,11 @@ app.get("/api/jobs", requireAuth, async (req, res) => {
       return { ...job, recipientsPreview, recipientsCount };
     })
   );
+  jobsWithPreview.sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
   res.json(jobsWithPreview);
 });
 
@@ -644,6 +743,66 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   res.status(201).json(job);
 });
 
+app.get("/api/jobs/:id/recipients", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const payload = await readJson(jobsFilePath, { jobs: [] });
+  const job = payload.jobs.find((j) => j.id === id);
+  if (!job) return res.status(404).json({ message: "Job not found" });
+  if (req.user.role !== "admin" && job.owner !== req.user.username) {
+    return res.status(403).json({ message: "You cannot access this job" });
+  }
+  const recipients = await loadRecipients(job);
+  res.json({ recipients });
+});
+
+app.put("/api/jobs/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const {
+    subject = "",
+    fromName = "",
+    replyTo = "",
+    textBody = "",
+    htmlBody = "",
+    recipients,
+    batchSize,
+    delayBetweenBatches = 2,
+    maxRetries = 3,
+  } = req.body || {};
+  if (!subject || !fromName) {
+    return res.status(400).json({ message: "fromName and subject are required" });
+  }
+  const payload = await readJson(jobsFilePath, { jobs: [] });
+  const job = payload.jobs.find((j) => j.id === id);
+  if (!job) return res.status(404).json({ message: "Job not found" });
+  if (req.user.role !== "admin" && job.owner !== req.user.username) {
+    return res.status(403).json({ message: "You cannot edit this job" });
+  }
+  const recipientList = normalizeRecipients(recipients);
+  if (!recipientList.length) {
+    return res.status(400).json({ message: "At least one recipient is required" });
+  }
+  job.subject = subject;
+  job.fromName = fromName;
+  job.replyTo = replyTo || undefined;
+  job.textBody = textBody;
+  job.htmlBody = htmlBody;
+  job.batchSize = parseInt(batchSize || job.batchSize || BATCH_SIZE_DEFAULT, 10);
+  job.delayBetweenBatches = parseInt(delayBetweenBatches || job.delayBetweenBatches || 2, 10);
+  job.maxRetries = parseInt(maxRetries || job.maxRetries || 3, 10);
+  job.recipientsCount = recipientList.length;
+  job.recipientsPreview = recipientList.slice(0, 5);
+  job.updatedAt = new Date().toISOString();
+  job.status = "pending";
+  delete job.lastResult;
+  delete job.lastSentAt;
+  job.sentCount = 0;
+  job.failedCount = 0;
+  delete job.error;
+  await writeJson(jobsFilePath, payload);
+  await saveRecipients(job.id, recipientList);
+  res.json(job);
+});
+
 app.delete("/api/jobs/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   const payload = await readJson(jobsFilePath, { jobs: [] });
@@ -675,6 +834,19 @@ app.post("/api/jobs/:id/send", requireAuth, async (req, res) => {
     const status = err.statusCode || 500;
     res.status(status).json({ message: err.message || "Failed to send email" });
   }
+});
+
+app.get("/api/activity", requireAuth, async (req, res) => {
+  const { limit = 50, owner } = req.query || {};
+  const data = await readActivityLog();
+  let entries = data.entries || [];
+  if (req.user.role !== "admin") {
+    entries = entries.filter((entry) => entry.owner === req.user.username);
+  } else if (owner) {
+    entries = entries.filter((entry) => entry.owner === owner);
+  }
+  const size = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  res.json(entries.slice(0, size));
 });
 
 app.delete("/admin/jobs/:id/recipients", requireAuth, requireAdmin, async (req, res) => {
@@ -796,6 +968,7 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
   const source = formatFromAddress(job.fromName || job.from, sourceEmail);
   let sent = 0;
   let failed = 0;
+  const errors = [];
   for (const recipient of batch) {
     const params = {
       Destination: { ToAddresses: [recipient] },
@@ -819,9 +992,10 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
       sent += 1;
     } catch (err) {
       failed += 1;
+      errors.push(err.message);
     }
   }
-  return { success: failed === 0, sent, failed, recipients: batch };
+  return { success: failed === 0, sent, failed, recipients: batch, error: errors[0] };
 }
 
 function stripHtml(html) {
@@ -849,6 +1023,7 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
       job.error = errMsg;
       job.updatedAt = new Date().toISOString();
       await writeJson(jobsFilePath, payload);
+      await recordActivity(job, null, errMsg);
       const rateErr = new Error(errMsg);
       rateErr.statusCode = 429;
       throw rateErr;
@@ -866,12 +1041,14 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
     delete job.error;
     job.updatedAt = new Date().toISOString();
     await writeJson(jobsFilePath, payload);
+    await recordActivity(job, result);
     return result;
   } catch (err) {
     job.status = "failed";
     job.error = err.message;
     job.updatedAt = new Date().toISOString();
     await writeJson(jobsFilePath, payload);
+    await recordActivity(job, null, err.message);
     throw err;
   }
 }
@@ -928,6 +1105,7 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
   const transporter = nodemailer.createTransport(transportOptions);
   let sent = 0;
   let failed = 0;
+  const errors = [];
   for (const recipient of batch) {
     try {
       await transporter.sendMail({
@@ -941,6 +1119,7 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
       sent += 1;
     } catch (err) {
       failed += 1;
+      errors.push(err.message);
     }
   }
   return {
@@ -951,6 +1130,7 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
     smtpId: smtpServer.id || smtpServer.username,
     smtpLabel: smtpServer.label,
     transport: "smtp",
+    error: errors[0],
   };
 }
 

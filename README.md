@@ -55,3 +55,21 @@ Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compat
 - Auto-created if `data/auth.json` is empty:  
   - Username: `admin`  
   - Password: `admin123` (change immediately via admin panel or `/admin/users/{id}/change-password`).
+
+## Syncing `/data` to GitHub
+All persistent state (users, jobs, SMTP pool, logs, etc.) lives under `/data`. To keep that folder versioned in Git without running extra CLI scripts, call the admin-only API endpoint:
+
+```
+POST /admin/data-sync
+Authorization: Bearer <ADMIN TOKEN>
+Content-Type: application/json
+
+{
+  "message": "chore: sync data folder",   // optional commit message
+  "push": true                            // set false to skip `git push`
+}
+```
+
+The endpoint stages `data/`, creates a commit (if there are changes), and optionally pushes to the current remote. It returns a JSON body indicating whether a commit occurred and if it was pushed. Use it from a secure admin UI, a curl command, or an automation hook.
+
+⚠️ `/data` contains credentials, recipient lists, and logs. Only call this endpoint in trusted environments targeting a private repository, and consider redacting sensitive files before syncing.
