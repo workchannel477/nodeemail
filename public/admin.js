@@ -27,7 +27,7 @@ const adminAppDefinition = () => ({
     showChangePasswordModal: false,
     showEditUserModal: false,
     activeTab: 'all',
-    dataSync: { message: '', push: true, busy: false, status: '', error: '' },
+    dataSync: { message: '', push: true, busy: false, status: '', error: '', logs: [] },
     
     // Computed
     get filteredJobs() {
@@ -523,6 +523,7 @@ const adminAppDefinition = () => ({
     async syncDataRepo() {
       this.dataSync.error = '';
       this.dataSync.status = '';
+      this.dataSync.logs = [];
       this.dataSync.busy = true;
       try {
         const response = await apiFetch('/admin/data-sync', {
@@ -534,8 +535,10 @@ const adminAppDefinition = () => ({
           })
         });
         const data = await response.json();
+        this.dataSync.logs = Array.isArray(data.logs) ? data.logs : [];
         if (!response.ok) {
-          throw new Error(data.message || 'Failed to sync data');
+          this.dataSync.error = data.message || 'Failed to sync data';
+          return;
         }
         this.dataSync.status = data.message || 'Data sync completed.';
         if (this.dataSync.push === false) {

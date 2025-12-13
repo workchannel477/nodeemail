@@ -487,6 +487,20 @@ http://host:port"></textarea>
             <p class="text-xs text-gray-500 mt-4">Only use this in trusted environments. /data can contain credentials and recipient lists.</p>
             <p class="text-sm text-green-600 mt-2" x-show="dataSync.status" x-text="dataSync.status"></p>
             <p class="text-sm text-red-600 mt-2" x-show="dataSync.error" x-text="dataSync.error"></p>
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Sync console</label>
+              <div class="bg-gray-900 text-gray-100 rounded-lg p-3 text-xs font-mono h-48 overflow-y-auto space-y-3">
+                <template x-if="!dataSync.logs.length">
+                  <p class="text-gray-400">No logs yet. Trigger a sync to see git output.</p>
+                </template>
+                <template x-for="(log, idx) in dataSync.logs" :key="idx">
+                  <div>
+                    <div class="text-amber-300" x-text="`$ ${log.command || ''}`"></div>
+                    <pre class="whitespace-pre-wrap break-words" x-text="log.stdout || log.stderr || '(no output)'"></pre>
+                  </div>
+                </template>
+              </div>
+            </div>
           </section>
 
           <!-- Jobs Overview -->

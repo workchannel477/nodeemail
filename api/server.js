@@ -38,6 +38,8 @@ const MAX_REQUESTS_PER_MINUTE = parseInt(process.env.MAX_REQUESTS_PER_MINUTE || 
 const EMAIL_RATE_LIMIT = parseInt(process.env.MAX_EMAILS_PER_MINUTE || "10", 10);
 const BATCH_SIZE_DEFAULT = parseInt(process.env.EMAIL_BATCH_SIZE || "50", 10);
 const SMTP_ROTATE_AFTER_DEFAULT = 200;
+const SMTP_CONNECTION_TIMEOUT_MS = parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || "15000", 10);
+const SMTP_SOCKET_TIMEOUT_MS = parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || "20000", 10);
 const DATA_SYNC_DEFAULT_MESSAGE = "chore: sync data folder";
 
 const sessions = new Map();
@@ -235,32 +237,45 @@ async function recordActivity(job, result, errorMessage) {
   await appendActivityLog(entry);
 }
 
-function gitStatusForData() {
-  return execSync("git status --porcelain data", {
-    cwd: rootDir,
-    stdio: ["ignore", "pipe", "pipe"],
-  })
-    .toString()
-    .trim();
+function runGitCommand(command, logs, { allowFailure = false } = {}) {
+  const entry = { command };
+  try {
+    const stdout = execSync(command, {
+      cwd: rootDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    entry.stdout = stdout.toString().trim();
+    logs.push(entry);
+    return entry.stdout || "";
+  } catch (err) {
+    entry.stdout = err.stdout ? err.stdout.toString().trim() : "";
+    entry.stderr = err.stderr ? err.stderr.toString().trim() : err.message;
+    entry.failed = true;
+    logs.push(entry);
+    if (allowFailure) {
+      return entry.stdout || entry.stderr || "";
+    }
+    const error = new Error(entry.stderr || entry.stdout || err.message);
+    error.gitLogs = logs;
+    throw error;
+  }
 }
 
 function syncDataRepo({ message, push }) {
-  const status = gitStatusForData();
-  if (!status) {
-    return { changed: false, pushed: false };
+  const logs = [];
+  const statusOutput = runGitCommand("git status --porcelain data", logs, { allowFailure: true });
+  if (!statusOutput.trim()) {
+    return { changed: false, pushed: false, logs };
   }
-  execSync("git add data", { cwd: rootDir, stdio: ["ignore", "pipe", "pipe"] });
+  runGitCommand("git add data", logs);
   const commitMessage = String(message || "").trim() || DATA_SYNC_DEFAULT_MESSAGE;
-  execSync(`git commit -m ${JSON.stringify(commitMessage)}`, {
-    cwd: rootDir,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  runGitCommand(`git commit -m ${JSON.stringify(commitMessage)}`, logs);
   let pushed = false;
   if (push) {
-    execSync("git push", { cwd: rootDir, stdio: ["ignore", "pipe", "pipe"] });
+    runGitCommand("git push", logs);
     pushed = true;
   }
-  return { changed: true, pushed, commitMessage };
+  return { changed: true, pushed, commitMessage, logs };
 }
 
 function extractToken(req) {
@@ -670,7 +685,8 @@ app.post("/admin/data-sync", requireAuth, requireAdmin, async (req, res) => {
       : "No changes detected.";
     res.json({ message: text, ...result });
   } catch (err) {
-    res.status(500).json({ message: err.message || "Failed to sync data" });
+    const logs = err.gitLogs || [];
+    res.status(500).json({ message: err.message || "Failed to sync data", logs });
   }
 });
 
@@ -1094,6 +1110,9 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
       user: smtpServer.username,
       pass: smtpServer.password,
     },
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
   };
   if (proxyUrl) {
     if (proxyUrl.startsWith("socks")) {
@@ -1120,6 +1139,10 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
     } catch (err) {
       failed += 1;
       errors.push(err.message);
+      console.error(
+        `SMTP send failure (${smtpServer.label || smtpServer.username} -> ${recipient}):`,
+        err.message
+      );
     }
   }
   return {
