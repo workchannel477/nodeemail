@@ -205,12 +205,24 @@ async function appendActivityLog(entry) {
 }
 
 function extractResultError(result = {}) {
-  if (!Array.isArray(result.results)) return null;
-  const failed = result.results.find((batch) => batch && batch.error);
-  if (failed && failed.error) return failed.error;
-  const failedCounts = result.results.find((batch) => batch && batch.failed > 0);
-  if (failedCounts) {
-    return `Failed to send to ${failedCounts.failed} recipient(s)`;
+  if (Array.isArray(result.results)) {
+    for (const batch of result.results) {
+      if (batch && Array.isArray(batch.errorDetails) && batch.errorDetails.length) {
+        const detail = batch.errorDetails[0] || {};
+        if (detail.code) {
+          return `SMTP error ${detail.code}: ${detail.message || detail.response || "Unknown error"}`;
+        }
+        if (detail.message || detail.response) {
+          return detail.message || detail.response;
+        }
+      }
+      if (batch && batch.error) {
+        return batch.error;
+      }
+      if (batch && batch.failed > 0) {
+        return `Failed to send to ${batch.failed} recipient(s)`;
+      }
+    }
   }
   return null;
 }
@@ -222,6 +234,9 @@ function summarizeSend(job, result) {
 
 async function recordActivity(job, result, errorMessage) {
   const summaryMessage = errorMessage || extractResultError(result) || summarizeSend(job, result);
+  const flattenedDetails = Array.isArray(result?.results)
+    ? result.results.flatMap((batch) => batch.errorDetails || []).slice(0, 20)
+    : [];
   const entry = {
     id: uuid(),
     jobId: job.id,
@@ -233,6 +248,7 @@ async function recordActivity(job, result, errorMessage) {
     recipientsCount: job.recipientsCount || 0,
     message: summaryMessage,
     timestamp: new Date().toISOString(),
+    errorDetails: flattenedDetails,
   };
   await appendActivityLog(entry);
 }
@@ -985,6 +1001,7 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
   let sent = 0;
   let failed = 0;
   const errors = [];
+  const errorDetails = [];
   for (const recipient of batch) {
     const params = {
       Destination: { ToAddresses: [recipient] },
@@ -1009,9 +1026,16 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
     } catch (err) {
       failed += 1;
       errors.push(err.message);
+      errorDetails.push({
+        recipient,
+        message: err.message,
+        code: err?.$metadata?.httpStatusCode || err.code,
+        response: err?.message,
+      });
+      console.error(`SES send failure (${recipient}):`, err.message);
     }
   }
-  return { success: failed === 0, sent, failed, recipients: batch, error: errors[0] };
+  return { success: failed === 0, sent, failed, recipients: batch, error: errors[0], errorDetails };
 }
 
 function stripHtml(html) {
@@ -1054,7 +1078,12 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
     job.lastResult = summary;
     job.sentCount = summary.sent;
     job.failedCount = summary.failed;
-    delete job.error;
+    const failureMsg = extractResultError(result);
+    if (!result.success && failureMsg) {
+      job.error = failureMsg;
+    } else {
+      delete job.error;
+    }
     job.updatedAt = new Date().toISOString();
     await writeJson(jobsFilePath, payload);
     await recordActivity(job, result);
@@ -1125,6 +1154,7 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
   let sent = 0;
   let failed = 0;
   const errors = [];
+  const errorDetails = [];
   for (const recipient of batch) {
     try {
       await transporter.sendMail({
@@ -1139,9 +1169,17 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
     } catch (err) {
       failed += 1;
       errors.push(err.message);
+      errorDetails.push({
+        recipient,
+        message: err.message,
+        code: err && (err.responseCode || err.code),
+        command: err && err.command,
+        response: err && err.response,
+      });
       console.error(
         `SMTP send failure (${smtpServer.label || smtpServer.username} -> ${recipient}):`,
-        err.message
+        err.responseCode || err.code,
+        err.response || err.message
       );
     }
   }
@@ -1154,6 +1192,7 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
     smtpLabel: smtpServer.label,
     transport: "smtp",
     error: errors[0],
+    errorDetails,
   };
 }
 

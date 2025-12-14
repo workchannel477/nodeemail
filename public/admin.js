@@ -546,6 +546,7 @@ const adminAppDefinition = () => ({
         }
       } catch (error) {
         this.dataSync.error = error.message;
+        this.dataSync.logs = [];
       } finally {
         this.dataSync.busy = false;
       }
