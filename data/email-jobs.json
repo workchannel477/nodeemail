@@ -3,11 +3,11 @@
     {
       "id": "4d00b7b4-c138-4cb2-b8dd-aac47ccf4f9d",
       "owner": "admin",
-      "subject": "Testing",
-      "fromName": "Marketing",
+      "subject": "Signup Confirmation",
+      "fromName": "Justice from Scriping LTD.",
       "replyTo": "workloadx@gmail.com",
       "textBody": "",
-      "htmlBody": "Testing",
+      "htmlBody": "Hi,\n\nWe noticed you opted in for a service recently, please could you please confirm that this is correct?\n\nRegards\nJustice from Scriping",
       "recipients": [
         "workchannel09@gmail.com"
       ],
@@ -16,15 +16,23 @@
       "maxRetries": 3,
       "status": "sent",
       "createdAt": "2025-12-10T15:15:32.889Z",
-      "updatedAt": "2025-12-10T15:15:39.292Z",
-      "lastSentAt": "2025-12-10T15:15:39.292Z",
+      "updatedAt": "2025-12-14T15:18:00.828Z",
+      "sentCount": 6,
+      "failedCount": 0,
+      "recipientsCount": 5,
+      "recipientsPreview": [
+        "workchannel09@gmail.com",
+        "wakidy101@gmail.com",
+        "ekesonkalu001@gmail.com",
+        "bloom.eeoii@gmail.com",
+        "workchannel09@gmail.com"
+      ],
+      "lastSentAt": "2025-12-14T15:18:00.828Z",
       "lastResult": {
-        "sent": 1,
+        "sent": 6,
         "failed": 0,
         "batches": 1
-      },
-      "sentCount": 1,
-      "failedCount": 0
+      }
     },
     {
       "id": "0a508d3e-8ee9-4f44-9a9f-791782d02445",
@@ -99,15 +107,15 @@
       "maxRetries": 3,
       "status": "sent",
       "createdAt": "2025-12-10T15:56:30.840Z",
-      "updatedAt": "2025-12-10T15:56:39.590Z",
-      "lastSentAt": "2025-12-10T15:56:39.590Z",
+      "updatedAt": "2025-12-14T09:48:43.046Z",
+      "sentCount": 2,
+      "failedCount": 0,
+      "lastSentAt": "2025-12-14T09:48:43.046Z",
       "lastResult": {
         "sent": 2,
         "failed": 0,
         "batches": 1
-      },
-      "sentCount": 2,
-      "failedCount": 0
+      }
     },
     {
       "id": "13e45d26-2940-405c-8fa1-9b29e1d7fb7c",

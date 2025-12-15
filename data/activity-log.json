@@ -1,1 +1,43 @@
-{"entries":[]}
+{
+  "entries": [
+    {
+      "id": "836cf35a-ee7e-43b8-a132-f02d0a7cff96",
+      "jobId": "4d00b7b4-c138-4cb2-b8dd-aac47ccf4f9d",
+      "owner": "admin",
+      "subject": "Signup Confirmation",
+      "status": "sent",
+      "sent": 6,
+      "failed": 0,
+      "recipientsCount": 5,
+      "message": "Sent 6/5 emails",
+      "timestamp": "2025-12-14T15:18:00.830Z",
+      "errorDetails": []
+    },
+    {
+      "id": "827e4f6f-1937-4f43-87bc-782a93c01549",
+      "jobId": "4d00b7b4-c138-4cb2-b8dd-aac47ccf4f9d",
+      "owner": "admin",
+      "subject": "Testing",
+      "status": "sent",
+      "sent": 5,
+      "failed": 0,
+      "recipientsCount": 4,
+      "message": "Sent 5/4 emails",
+      "timestamp": "2025-12-14T15:10:27.634Z",
+      "errorDetails": []
+    },
+    {
+      "id": "016ffd26-3176-493a-bfb9-395d2f5f4094",
+      "jobId": "7704a8ec-4f10-46de-98bb-cefb67e5e91e",
+      "owner": "admin",
+      "subject": "Testing",
+      "status": "sent",
+      "sent": 2,
+      "failed": 0,
+      "recipientsCount": 2,
+      "message": "Sent 2/2 emails",
+      "timestamp": "2025-12-14T09:48:43.047Z",
+      "errorDetails": []
+    }
+  ]
+}
