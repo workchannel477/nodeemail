@@ -12,6 +12,18 @@ const adminAppDefinition = () => ({
     rateLimits: { limits: {} },
     stats: {},
     smtpPool: { servers: [], rotateAfter: 200, sentSinceRotation: 0, currentIndex: 0 },
+    mailProviders: [],
+    providerFormVisible: false,
+    providerForm: {
+      id: null,
+      name: '',
+      type: 'smtp',
+      enabled: true,
+      quotaPerMinute: 60,
+      quotaPerDay: 500,
+      config: {}
+    },
+    editingProviderId: null,
     loginForm: { username: '', password: '' },
     passwordForm: { newPassword: '' },
     ipForm: { proxies: '' },
@@ -48,6 +60,7 @@ const adminAppDefinition = () => ({
         await this.loadIPRotation();
         await this.loadRateLimits();
         await this.loadSmtpPool();
+        await this.loadMailProviders();
       }
     },
     
@@ -85,6 +98,7 @@ const adminAppDefinition = () => ({
         await this.loadIPRotation();
         await this.loadRateLimits();
         await this.loadSmtpPool();
+        await this.loadMailProviders();
         
         this.message = 'Login successful!';
         setTimeout(() => this.message = '', 3000);
@@ -163,6 +177,201 @@ const adminAppDefinition = () => ({
         console.error('Failed to load SMTP pool:', error);
       }
     },
+
+    providerConfigTemplate(type) {
+      if (type === 'ses') {
+        return {
+          region: '',
+          accessKeyId: '',
+          secretAccessKey: '',
+          fromAddress: '',
+          proxy: ''
+        };
+      }
+      if (type === 'zoho') {
+        return {
+          accountId: '',
+          clientId: '',
+          clientSecret: '',
+          refreshToken: '',
+          fromAddress: '',
+          accountsHost: '',
+          mailHost: ''
+        };
+      }
+      return {
+        fromAddress: '',
+        host: '',
+        port: 587,
+        username: '',
+        password: '',
+        proxy: ''
+      };
+    },
+
+    providerConfigFields() {
+      const type = this.providerForm.type;
+      if (type === 'ses') {
+        return [
+          { key: 'region', label: 'AWS Region', type: 'text' },
+          { key: 'accessKeyId', label: 'Access Key ID', type: 'text' },
+          { key: 'secretAccessKey', label: 'Secret Access Key', type: 'password' },
+          { key: 'fromAddress', label: 'From address', type: 'email' },
+          { key: 'proxy', label: 'Proxy URL (optional)', type: 'text' }
+        ];
+      }
+      if (type === 'zoho') {
+        return [
+          { key: 'accountId', label: 'Account ID', type: 'text' },
+          { key: 'clientId', label: 'Client ID', type: 'text' },
+          { key: 'clientSecret', label: 'Client Secret', type: 'password' },
+          { key: 'refreshToken', label: 'Refresh Token', type: 'password' },
+          { key: 'fromAddress', label: 'From address', type: 'email' },
+          { key: 'accountsHost', label: 'Accounts host (optional)', type: 'text' },
+          { key: 'mailHost', label: 'Mail host (optional)', type: 'text' }
+        ];
+      }
+      return [
+        { key: 'fromAddress', label: 'From address', type: 'email' },
+        { key: 'host', label: 'SMTP host', type: 'text' },
+        { key: 'port', label: 'Port', type: 'number' },
+        { key: 'username', label: 'Username', type: 'text' },
+        { key: 'password', label: 'Password', type: 'password' },
+        { key: 'proxy', label: 'Proxy URL (optional)', type: 'text' }
+      ];
+    },
+
+    resetProviderForm(provider = null) {
+      if (provider) {
+        const template = this.providerConfigTemplate(provider.type || 'smtp');
+        this.providerForm = {
+          id: provider.id,
+          name: provider.name,
+          type: provider.type,
+          enabled: provider.enabled,
+          quotaPerMinute: provider.quotaPerMinute,
+          quotaPerDay: provider.quotaPerDay,
+          config: { ...template, ...(provider.config || {}) }
+        };
+      } else {
+        this.providerForm = {
+          id: null,
+          name: '',
+          type: 'smtp',
+          enabled: true,
+          quotaPerMinute: 60,
+          quotaPerDay: 500,
+          config: this.providerConfigTemplate('smtp')
+        };
+      }
+    },
+
+    handleProviderTypeChange() {
+      this.providerForm.config = this.providerConfigTemplate(this.providerForm.type);
+    },
+
+    async loadMailProviders() {
+      try {
+        const response = await apiFetch('/admin/providers', { headers: this.headers() });
+        if (!response.ok) throw new Error('Unable to load providers');
+        this.mailProviders = await response.json();
+      } catch (error) {
+        console.error('Failed to load mail providers:', error);
+      }
+    },
+
+    openProviderForm(provider = null) {
+      if (provider) {
+        this.resetProviderForm(provider);
+        this.editingProviderId = provider.id;
+      } else {
+        this.resetProviderForm();
+        this.editingProviderId = null;
+      }
+      this.providerFormVisible = true;
+    },
+
+    cancelProviderForm() {
+      this.providerFormVisible = false;
+      this.editingProviderId = null;
+      this.resetProviderForm();
+    },
+
+    async saveProvider() {
+      this.error = '';
+      const body = {
+        name: this.providerForm.name,
+        type: this.providerForm.type,
+        enabled: this.providerForm.enabled,
+        quotaPerMinute: Number(this.providerForm.quotaPerMinute) || 0,
+        quotaPerDay: Number(this.providerForm.quotaPerDay) || 0,
+        config: this.providerForm.config
+      };
+      const method = this.editingProviderId ? 'PUT' : 'POST';
+      const url = this.editingProviderId
+        ? `/admin/providers/${this.editingProviderId}`
+        : '/admin/providers';
+      try {
+        const response = await apiFetch(url, {
+          method,
+          headers: this.headers(),
+          body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to save provider');
+        }
+        this.message = data.message || 'Provider saved';
+        setTimeout(() => (this.message = ''), 3000);
+        this.providerFormVisible = false;
+        this.editingProviderId = null;
+        await this.loadMailProviders();
+      } catch (error) {
+        this.error = error.message;
+      }
+    },
+
+    async deleteProvider(id) {
+      if (!confirm('Remove this provider?')) return;
+      try {
+        const response = await apiFetch(`/admin/providers/${id}`, {
+          method: 'DELETE',
+          headers: this.headers()
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to remove provider');
+        this.message = data.message;
+        setTimeout(() => (this.message = ''), 3000);
+        await this.loadMailProviders();
+      } catch (error) {
+        this.error = error.message;
+      }
+    },
+
+    async resetProviderUsage(id) {
+      if (!confirm('Reset usage counters for this provider?')) return;
+      try {
+        const response = await apiFetch(`/admin/providers/${id}/reset-usage`, {
+          method: 'POST',
+          headers: this.headers()
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to reset usage');
+        this.message = data.message;
+        setTimeout(() => (this.message = ''), 3000);
+        await this.loadMailProviders();
+      } catch (error) {
+        this.error = error.message;
+      }
+    },
+
+    providerUsageSummary(provider) {
+      const usage = provider.usage || {};
+      const sentToday = usage.sentToday || 0;
+      const perMinute = (usage.minuteWindow || []).length;
+      return `${sentToday}/${provider.quotaPerDay || '∞'} today · ${perMinute}/${provider.quotaPerMinute || '∞'} this minute`;
+    },
+
     
     async addSmtp() {
       this.error = '';

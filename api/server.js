@@ -4,13 +4,15 @@ import path from "path";
 import fs from "fs-extra";
 import { fileURLToPath } from "url";
 import { v4 as uuid } from "uuid";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
 import { NodeHttpHandler } from "@aws-sdk/node-http-handler";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import nodemailer from "nodemailer";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { createHash } from "crypto";
 import { execSync } from "child_process";
+import FormData from "form-data";
+import https from "https";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -28,6 +30,7 @@ const jobsFilePath = path.join(dataDir, "email-jobs.json");
 const ipRotationFilePath = path.join(dataDir, "ip-rotation.json");
 const rateLimitFilePath = path.join(dataDir, "rate-limit.json");
 const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
+const mailProvidersFilePath = path.join(dataDir, "mail-providers.json");
 const activityLogPath = path.join(dataDir, "activity-log.json");
 
 const app = express();
@@ -41,9 +44,19 @@ const SMTP_ROTATE_AFTER_DEFAULT = 200;
 const SMTP_CONNECTION_TIMEOUT_MS = parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || "15000", 10);
 const SMTP_SOCKET_TIMEOUT_MS = parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || "20000", 10);
 const DATA_SYNC_DEFAULT_MESSAGE = "chore: sync data folder";
+const MAIL_TRANSPORT = (process.env.MAIL_TRANSPORT || "smtp").toLowerCase();
+const ZOHO_DOMAIN = process.env.ZOHO_DOMAIN || "zoho.com";
+const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID || "";
+const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET || "";
+const ZOHO_REFRESH_TOKEN = process.env.ZOHO_REFRESH_TOKEN || "";
+const ZOHO_FROM_ADDRESS = process.env.ZOHO_FROM_ADDRESS || process.env.SES_FROM || process.env.DEFAULT_FROM;
+const ZOHO_ACCOUNT_ID = process.env.ZOHO_ACCOUNT_ID || "";
+const ZOHO_ACCOUNTS_HOST = process.env.ZOHO_ACCOUNTS_HOST || `accounts.${ZOHO_DOMAIN}`;
+const ZOHO_MAIL_HOST = process.env.ZOHO_MAIL_HOST || `mail.${ZOHO_DOMAIN}`;
 
 const sessions = new Map();
 const apiRate = new Map();
+const zohoTokenCache = new Map();
 
 ensureDataFiles();
 
@@ -109,6 +122,9 @@ async function ensureDataFiles() {
   }
   if (!(await fs.pathExists(activityLogPath))) {
     await fs.writeJson(activityLogPath, { entries: [] });
+  }
+  if (!(await fs.pathExists(mailProvidersFilePath))) {
+    await fs.writeJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
   }
 }
 
@@ -251,6 +267,390 @@ async function recordActivity(job, result, errorMessage) {
     errorDetails: flattenedDetails,
   };
   await appendActivityLog(entry);
+}
+
+function normalizeProviderUsage(usage = {}) {
+  return {
+    dayKey: usage.dayKey || new Date().toISOString().slice(0, 10),
+    sentToday: Number(usage.sentToday) || 0,
+    minuteWindow: Array.isArray(usage.minuteWindow)
+      ? usage.minuteWindow.map((ts) => Number(ts)).filter((ts) => Number.isFinite(ts))
+      : [],
+  };
+}
+
+function normalizeMailProvider(provider = {}) {
+  return {
+    id: provider.id || uuid(),
+    name: provider.name || "Provider",
+    type: (provider.type || "smtp").toLowerCase(),
+    enabled: provider.enabled !== false,
+    quotaPerMinute: Number(provider.quotaPerMinute) || 60,
+    quotaPerDay: Number(provider.quotaPerDay) || 1000,
+    config: provider.config || {},
+    usage: normalizeProviderUsage(provider.usage),
+    createdAt: provider.createdAt || new Date().toISOString(),
+    updatedAt: provider.updatedAt || new Date().toISOString(),
+  };
+}
+
+async function loadMailProviderPool() {
+  const pool = await readJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
+  pool.providers = Array.isArray(pool.providers)
+    ? pool.providers.map(normalizeMailProvider)
+    : [];
+  pool.rotationIndex = Number(pool.rotationIndex) || 0;
+  return pool;
+}
+
+async function saveMailProviderPool(pool) {
+  pool.providers = (pool.providers || []).map(normalizeMailProvider);
+  pool.rotationIndex = pool.providers.length
+    ? Math.max(0, Math.min(Number(pool.rotationIndex) || 0, pool.providers.length - 1))
+    : 0;
+  await writeJson(mailProvidersFilePath, pool);
+}
+
+function ensureProviderUsage(provider, now = Date.now()) {
+  let mutated = false;
+  provider.usage = normalizeProviderUsage(provider.usage);
+  const dayKey = new Date(now).toISOString().slice(0, 10);
+  if (provider.usage.dayKey !== dayKey) {
+    provider.usage.dayKey = dayKey;
+    provider.usage.sentToday = 0;
+    provider.usage.minuteWindow = [];
+    mutated = true;
+  }
+  const filtered = provider.usage.minuteWindow.filter((ts) => now - ts < 60_000);
+  if (filtered.length !== provider.usage.minuteWindow.length) {
+    provider.usage.minuteWindow = filtered;
+    mutated = true;
+  }
+  return mutated;
+}
+
+function providerCanSend(provider, batchSize, now = Date.now()) {
+  ensureProviderUsage(provider, now);
+  if (provider.quotaPerDay > 0 && provider.usage.sentToday + batchSize > provider.quotaPerDay) {
+    return false;
+  }
+  if (
+    provider.quotaPerMinute > 0 &&
+    provider.usage.minuteWindow.length + batchSize > provider.quotaPerMinute
+  ) {
+    return false;
+  }
+  return true;
+}
+
+async function incrementProviderUsage(providerId, increment) {
+  if (!providerId || !increment) return;
+  const pool = await loadMailProviderPool();
+  const provider = pool.providers.find((p) => p.id === providerId);
+  if (!provider) return;
+  const now = Date.now();
+  ensureProviderUsage(provider, now);
+  for (let i = 0; i < increment; i += 1) {
+    provider.usage.minuteWindow.push(now);
+  }
+  provider.usage.sentToday += increment;
+  provider.updatedAt = new Date().toISOString();
+  await saveMailProviderPool(pool);
+}
+
+async function selectMailProvider(batchSize, excludeIds = []) {
+  const pool = await loadMailProviderPool();
+  const { providers } = pool;
+  if (!providers.length) return null;
+  const start = pool.rotationIndex || 0;
+  const now = Date.now();
+  let mutated = false;
+  for (let i = 0; i < providers.length; i += 1) {
+    const idx = (start + i) % providers.length;
+    const provider = providers[idx];
+    if (!provider || !provider.enabled || excludeIds.includes(provider.id)) continue;
+    if (ensureProviderUsage(provider, now)) mutated = true;
+    if (!providerCanSend(provider, batchSize, now)) continue;
+    pool.rotationIndex = (idx + 1) % providers.length;
+    mutated = true;
+    if (mutated) {
+      await saveMailProviderPool(pool);
+    }
+    return provider;
+  }
+  if (mutated) {
+    await saveMailProviderPool(pool);
+  }
+  return null;
+}
+
+async function dispatchWithProvider(provider, job, batch) {
+  const type = provider.type || "smtp";
+  const config = provider.config || {};
+  if (type === "zoho") {
+    return sendBatchWithZoho(job, batch, config);
+  }
+  if (type === "ses") {
+    const proxy = config.proxy || null;
+    return sendBatchWithSes(job, batch, proxy, config);
+  }
+  if (type === "smtp") {
+    const smtpConfig = {
+      ...config,
+      label: config.label || provider.name,
+      from: config.from || config.fromAddress,
+    };
+    return sendBatchWithSmtp(job, batch, smtpConfig, config.proxy);
+  }
+  return {
+    success: false,
+    sent: 0,
+    failed: batch.length,
+    recipients: batch,
+    transport: type,
+    error: `Unsupported provider type ${type}`,
+    errorDetails: [{ message: `Unsupported provider type ${type}` }],
+  };
+}
+
+async function sendBatchUsingProviders(job, batch) {
+  const tried = [];
+  const errors = [];
+  while (true) {
+    const provider = await selectMailProvider(batch.length, tried);
+    if (!provider) {
+      if (errors.length) throw new Error(errors.join(" | "));
+      return null;
+    }
+    const result = await dispatchWithProvider(provider, job, batch);
+    if (result.success) {
+      await incrementProviderUsage(provider.id, result.sent);
+      return { ...result, provider: { id: provider.id, name: provider.name, type: provider.type } };
+    }
+    errors.push(`${provider.name || provider.id}: ${result.error || "Failed to send"}`);
+    tried.push(provider.id);
+  }
+}
+
+async function hasEnabledMailProviders() {
+  const pool = await loadMailProviderPool();
+  return pool.providers.some((p) => p.enabled);
+}
+
+function validateProviderConfig(type, config = {}) {
+  if (type === "zoho") {
+    const required = ["accountId", "clientId", "clientSecret", "refreshToken", "fromAddress"];
+    const missing = required.filter((key) => !config[key]);
+    if (missing.length) return `Zoho provider missing: ${missing.join(", ")}`;
+    return null;
+  }
+  if (type === "ses") {
+    const required = ["region", "accessKeyId", "secretAccessKey", "fromAddress"];
+    const missing = required.filter((key) => !config[key]);
+    if (missing.length) return `SES provider missing: ${missing.join(", ")}`;
+    return null;
+  }
+  if (type === "smtp") {
+    const required = ["host", "port", "username", "password", "fromAddress"];
+    const missing = required.filter((key) => !config[key]);
+    if (missing.length) return `SMTP provider missing: ${missing.join(", ")}`;
+    return null;
+  }
+  return `Unsupported provider type ${type}`;
+}
+
+function sanitizeProviderPayload(payload = {}, existing = {}) {
+  const provider = { ...existing };
+  if (payload.name !== undefined) provider.name = String(payload.name || "").trim();
+  if (payload.type !== undefined) provider.type = String(payload.type || "smtp").toLowerCase();
+  if (payload.enabled !== undefined) provider.enabled = Boolean(payload.enabled);
+  if (payload.quotaPerMinute !== undefined) {
+    provider.quotaPerMinute = Math.max(0, parseInt(payload.quotaPerMinute, 10) || 0);
+  }
+  if (payload.quotaPerDay !== undefined) {
+    provider.quotaPerDay = Math.max(0, parseInt(payload.quotaPerDay, 10) || 0);
+  }
+  if (payload.config !== undefined) {
+    provider.config =
+      payload.config && typeof payload.config === "object" ? payload.config : provider.config || {};
+  }
+  provider.updatedAt = new Date().toISOString();
+  return normalizeMailProvider(provider);
+}
+
+async function getZohoAccessToken(config = {}) {
+  const clientId = config.clientId || ZOHO_CLIENT_ID;
+  const clientSecret = config.clientSecret || ZOHO_CLIENT_SECRET;
+  const refreshToken = config.refreshToken || ZOHO_REFRESH_TOKEN;
+  const accountsHost = config.accountsHost || config.accounts_host || ZOHO_ACCOUNTS_HOST;
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Zoho Mail API credentials are not configured");
+  }
+  const cacheKey = `${clientId}:${refreshToken}:${accountsHost}`;
+  const cached = zohoTokenCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt - 60_000) {
+    return cached.token;
+  }
+  const params = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: "refresh_token",
+  });
+  const response = await fetch(`https://${accountsHost}/oauth/v2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    const errMsg = data.error || data.error_description || response.statusText;
+    throw new Error(`Zoho token error: ${errMsg}`);
+  }
+  const expiresIn = Number(data.expires_in) || 3600;
+  zohoTokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + expiresIn * 1000 });
+  return data.access_token;
+}
+
+function normalizeJobAttachments(job) {
+  const list = Array.isArray(job?.attachments) ? job.attachments : [];
+  return list
+    .map((att) => {
+      if (!att || !att.filename) return null;
+      let buffer = null;
+      if (typeof att.content === "string") {
+        const encoding = att.encoding || "base64";
+        try {
+          buffer = Buffer.from(att.content, encoding);
+        } catch (err) {
+          return null;
+        }
+      } else if (att.buffer && Buffer.isBuffer(att.buffer)) {
+        buffer = att.buffer;
+      }
+      if (!buffer) return null;
+      return {
+        filename: att.filename,
+        contentType: att.contentType || att.mimetype || "application/octet-stream",
+        buffer,
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeAttachmentPayloadForStorage(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments
+    .map((att) => {
+      if (!att || !att.filename || !att.content) return null;
+      const encoding = (att.encoding || "base64").toLowerCase();
+      return {
+        filename: String(att.filename),
+        content: String(att.content),
+        encoding,
+        contentType: att.contentType || att.mimetype || "application/octet-stream",
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildZohoForm(job, recipients, config = {}) {
+  const accountId = config.accountId || ZOHO_ACCOUNT_ID;
+  if (!accountId) {
+    throw new Error("ZOHO_ACCOUNT_ID is not configured");
+  }
+  const fromAddress = job.from || config.fromAddress || ZOHO_FROM_ADDRESS;
+  if (!fromAddress) {
+    throw new Error("No from address configured for Zoho transport");
+  }
+  const content = job.htmlBody || job.textBody || "";
+  const form = new FormData();
+  form.append("fromAddress", fromAddress);
+  form.append("toAddress", recipients.join(","));
+  if (job.replyTo) form.append("replyToAddress", job.replyTo);
+  form.append("subject", job.subject || "");
+  form.append("content", content);
+  form.append("mailFormat", job.htmlBody ? "html" : "text");
+  const attachments = normalizeJobAttachments(job);
+  attachments.forEach((att) => {
+    form.append("attachments", att.buffer, {
+      filename: att.filename,
+      contentType: att.contentType,
+    });
+  });
+  return form;
+}
+
+async function submitZohoForm(form, config = {}) {
+  const token = await getZohoAccessToken(config);
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    Accept: "application/json",
+    ...form.getHeaders(),
+  };
+  const mailHost = config.mailHost || config.mail_host || ZOHO_MAIL_HOST;
+  const accountId = config.accountId || ZOHO_ACCOUNT_ID;
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        method: "POST",
+        host: mailHost,
+        path: `/api/accounts/${accountId}/messages`,
+        headers,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => {
+          data += chunk;
+        });
+        res.on("end", () => {
+          let parsed = {};
+          try {
+            parsed = data ? JSON.parse(data) : {};
+          } catch (err) {
+            parsed = { message: data };
+          }
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(parsed);
+          } else {
+            reject(
+              new Error(
+                `Zoho API ${res.statusCode}: ${parsed.message || parsed.data || data || res.statusMessage}`
+              )
+            );
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    form.pipe(req);
+  });
+}
+
+async function sendBatchWithZoho(job, batch, config = {}) {
+  try {
+    const form = buildZohoForm(job, batch, config);
+    await submitZohoForm(form, config);
+    return {
+      success: true,
+      sent: batch.length,
+      failed: 0,
+      recipients: batch,
+      transport: "zoho",
+      errorDetails: [],
+    };
+  } catch (err) {
+    console.error("Zoho send failure:", err.message);
+    return {
+      success: false,
+      sent: 0,
+      failed: batch.length,
+      recipients: batch,
+      transport: "zoho",
+      error: err.message,
+      errorDetails: [{ message: err.message }],
+    };
+  }
 }
 
 function runGitCommand(command, logs, { allowFailure = false } = {}) {
@@ -733,6 +1133,7 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
     textBody = "",
     htmlBody = "",
     recipients,
+    attachments = [],
     batchSize,
     delayBetweenBatches = 2,
     maxRetries = 3,
@@ -751,6 +1152,7 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   }
   const now = new Date().toISOString();
   const payload = await readJson(jobsFilePath, { jobs: [] });
+  const storedAttachments = normalizeAttachmentPayloadForStorage(attachments);
   const job = {
     id: uuid(),
     owner,
@@ -765,6 +1167,7 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
     batchSize: parseInt(batchSize || BATCH_SIZE_DEFAULT, 10),
     delayBetweenBatches: parseInt(delayBetweenBatches, 10),
     maxRetries: parseInt(maxRetries, 10),
+    attachments: storedAttachments,
     status: "pending",
     createdAt: now,
     updatedAt: now,
@@ -796,6 +1199,7 @@ app.put("/api/jobs/:id", requireAuth, async (req, res) => {
     textBody = "",
     htmlBody = "",
     recipients,
+    attachments,
     batchSize,
     delayBetweenBatches = 2,
     maxRetries = 3,
@@ -823,6 +1227,11 @@ app.put("/api/jobs/:id", requireAuth, async (req, res) => {
   job.maxRetries = parseInt(maxRetries || job.maxRetries || 3, 10);
   job.recipientsCount = recipientList.length;
   job.recipientsPreview = recipientList.slice(0, 5);
+  if (attachments !== undefined) {
+    job.attachments = normalizeAttachmentPayloadForStorage(attachments);
+  } else if (!Array.isArray(job.attachments)) {
+    job.attachments = [];
+  }
   job.updatedAt = new Date().toISOString();
   job.status = "pending";
   delete job.lastResult;
@@ -928,6 +1337,78 @@ app.get("/admin/overview", requireAuth, requireAdmin, async (_req, res) => {
   res.json({ users, jobs, ipRotation: ipData, rateLimits, smtpPool: sanitizedSmtpPool, stats });
 });
 
+app.get("/admin/providers", requireAuth, requireAdmin, async (_req, res) => {
+  const pool = await loadMailProviderPool();
+  res.json(pool.providers);
+});
+
+app.post("/admin/providers", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const payload = sanitizeProviderPayload(req.body || {});
+    const error = validateProviderConfig(payload.type, payload.config);
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+    const pool = await loadMailProviderPool();
+    payload.id = uuid();
+    payload.createdAt = new Date().toISOString();
+    pool.providers.push(payload);
+    await saveMailProviderPool(pool);
+    res.status(201).json(payload);
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Failed to create provider" });
+  }
+});
+
+app.put("/admin/providers/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = await loadMailProviderPool();
+    const idx = pool.providers.findIndex((p) => p.id === id);
+    if (idx === -1) return res.status(404).json({ message: "Provider not found" });
+    const updated = sanitizeProviderPayload(req.body || {}, pool.providers[idx]);
+    const error = validateProviderConfig(updated.type, updated.config);
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+    updated.id = id;
+    updated.createdAt = pool.providers[idx].createdAt || updated.createdAt;
+    pool.providers[idx] = updated;
+    await saveMailProviderPool(pool);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Failed to update provider" });
+  }
+});
+
+app.delete("/admin/providers/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = await loadMailProviderPool();
+    const idx = pool.providers.findIndex((p) => p.id === id);
+    if (idx === -1) return res.status(404).json({ message: "Provider not found" });
+    const removed = pool.providers.splice(idx, 1)[0];
+    await saveMailProviderPool(pool);
+    res.json({ message: "Provider removed", provider: removed });
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Failed to remove provider" });
+  }
+});
+
+app.post("/admin/providers/:id/reset-usage", requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = await loadMailProviderPool();
+    const provider = pool.providers.find((p) => p.id === id);
+    if (!provider) return res.status(404).json({ message: "Provider not found" });
+    provider.usage = normalizeProviderUsage();
+    await saveMailProviderPool(pool);
+    res.json({ message: "Usage reset", provider });
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Failed to reset usage" });
+  }
+});
+
 app.get("/healthz", async (_req, res) => {
   try {
     await ensureDataFiles();
@@ -947,14 +1428,29 @@ async function sendEmailJob(job) {
   const results = [];
   let sentTotal = 0;
   let failedTotal = 0;
+  const providersAvailable = await hasEnabledMailProviders();
 
   for (let i = 0; i < recipients.length; i += batchSize) {
     const batch = recipients.slice(i, i + batchSize);
     try {
+      if (providersAvailable) {
+        const providerResult = await sendBatchUsingProviders(job, batch);
+        if (providerResult) {
+          results.push(providerResult);
+          sentTotal += providerResult.sent;
+          failedTotal += providerResult.failed;
+          continue;
+        }
+      }
       const proxy = await getNextProxy();
-      const useSes = process.env.MAIL_TRANSPORT === "ses" && !(await hasConfiguredSmtpPool());
+      const useSes = MAIL_TRANSPORT === "ses" && !(await hasConfiguredSmtpPool());
       let smtpServer;
-      if (useSes) {
+      if (MAIL_TRANSPORT === "zoho") {
+        const zohoResult = await sendBatchWithZoho(job, batch);
+        results.push(zohoResult);
+        sentTotal += zohoResult.sent;
+        failedTotal += zohoResult.failed;
+      } else if (useSes) {
         const sesResult = await sendBatchWithSes(job, batch, proxy);
         results.push({ ...sesResult, proxy, transport: "ses" });
         sentTotal += sesResult.sent;
@@ -986,42 +1482,50 @@ async function sendEmailJob(job) {
   };
 }
 
-async function sendBatchWithSes(job, batch, proxyUrl) {
-  const region = process.env.AWS_REGION || "us-east-1";
+async function sendBatchWithSes(job, batch, proxyUrl, sesOptions = {}) {
+  const region = sesOptions.region || process.env.AWS_REGION || "us-east-1";
   const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+  const credentials =
+    sesOptions.accessKeyId && sesOptions.secretAccessKey
+      ? {
+          accessKeyId: sesOptions.accessKeyId,
+          secretAccessKey: sesOptions.secretAccessKey,
+        }
+      : undefined;
   const ses = new SESClient({
     region,
+    credentials,
     requestHandler: new NodeHttpHandler(agent ? { httpsAgent: agent } : {}),
   });
-  const sourceEmail = process.env.SES_FROM || process.env.DEFAULT_FROM || job.from;
+  const sourceEmail =
+    sesOptions.fromAddress || process.env.SES_FROM || process.env.DEFAULT_FROM || job.from;
   if (!sourceEmail) {
     throw new Error("No FROM email configured. Set SES_FROM or DEFAULT_FROM.");
   }
   const source = formatFromAddress(job.fromName || job.from, sourceEmail);
+  const attachments = normalizeJobAttachments(job).map((att) => ({
+    filename: att.filename,
+    content: att.buffer,
+    contentType: att.contentType,
+  }));
+  const transporter = nodemailer.createTransport({
+    SES: { ses, aws: { SendRawEmailCommand } },
+  });
   let sent = 0;
   let failed = 0;
   const errors = [];
   const errorDetails = [];
   for (const recipient of batch) {
-    const params = {
-      Destination: { ToAddresses: [recipient] },
-      Message: {
-        Subject: { Data: job.subject },
-        Body: {},
-      },
-      Source: source,
-    };
-    if (job.replyTo) {
-      params.ReplyToAddresses = [job.replyTo];
-    }
-    if (job.htmlBody) {
-      params.Message.Body.Html = { Data: job.htmlBody };
-      params.Message.Body.Text = { Data: job.textBody || stripHtml(job.htmlBody) };
-    } else {
-      params.Message.Body.Text = { Data: job.textBody || "" };
-    }
     try {
-      await ses.send(new SendEmailCommand(params));
+      await transporter.sendMail({
+        from: source,
+        to: recipient,
+        subject: job.subject,
+        text: job.textBody || (job.htmlBody ? stripHtml(job.htmlBody) : ""),
+        html: job.htmlBody,
+        replyTo: job.replyTo,
+        attachments,
+      });
       sent += 1;
     } catch (err) {
       failed += 1;
@@ -1029,8 +1533,8 @@ async function sendBatchWithSes(job, batch, proxyUrl) {
       errorDetails.push({
         recipient,
         message: err.message,
-        code: err?.$metadata?.httpStatusCode || err.code,
-        response: err?.message,
+        code: err?.responseCode || err.code,
+        response: err?.response || err.message,
       });
       console.error(`SES send failure (${recipient}):`, err.message);
     }
@@ -1155,6 +1659,11 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
   let failed = 0;
   const errors = [];
   const errorDetails = [];
+  const attachments = normalizeJobAttachments(job).map((att) => ({
+    filename: att.filename,
+    content: att.buffer,
+    contentType: att.contentType,
+  }));
   for (const recipient of batch) {
     try {
       await transporter.sendMail({
@@ -1164,6 +1673,7 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
         subject: job.subject,
         text: job.textBody || (job.htmlBody ? stripHtml(job.htmlBody) : ""),
         html: job.htmlBody,
+        attachments,
       });
       sent += 1;
     } catch (err) {
