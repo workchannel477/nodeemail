@@ -1,1 +1,1 @@
-# Email Management Stack
+# Email Management
