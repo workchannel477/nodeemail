@@ -43,6 +43,13 @@ const ENV_ALIASES = {
   DEFAULT_SMTP_HOST: ["APP_SMTP_HOST", "DEFAULT_SMTP_HOST"],
   DEFAULT_SMTP_PORT: ["APP_SMTP_PORT", "DEFAULT_SMTP_PORT"],
   DATA_OBFUSCATION_KEY: ["APP_DATA_MASK", "DATA_OBFUSCATION_KEY"],
+  ZEPTO_API_KEY: ["APP_ZEPTO_KEY", "ZEPTO_API_KEY"],
+  ZEPTO_FROM_ADDRESS: ["APP_ZEPTO_FROM", "ZEPTO_FROM_ADDRESS"],
+  ZEPTO_BASE_URL: ["APP_ZEPTO_URL", "ZEPTO_BASE_URL"],
+  ZEPTO_BOUNCE_ADDRESS: ["APP_ZEPTO_BOUNCE", "ZEPTO_BOUNCE_ADDRESS"],
+  ZEPTO_REPLY_TO: ["APP_ZEPTO_REPLY", "ZEPTO_REPLY_TO"],
+  ZEPTO_QUOTA_PER_MINUTE: ["APP_ZEPTO_QPM", "ZEPTO_QUOTA_PER_MINUTE"],
+  ZEPTO_QUOTA_PER_DAY: ["APP_ZEPTO_QPD", "ZEPTO_QUOTA_PER_DAY"],
 };
 
 function decodeSecretValue(raw) {
@@ -115,6 +122,15 @@ const DEFAULT_SMTP_HOST = envValue("DEFAULT_SMTP_HOST", "email-smtp.us-east-1.am
 const DEFAULT_SMTP_PORT = parseInt(envValue("DEFAULT_SMTP_PORT", "587"), 10);
 const DATA_OBFUSCATION_KEY = envValue("DATA_OBFUSCATION_KEY", "nodeemail", { secret: true }) || "nodeemail";
 const SESSION_TIMEOUT_SECONDS = parseInt(envValue("SESSION_TIMEOUT", "3600"), 10);
+const ZEPTO_API_KEY = envValue("ZEPTO_API_KEY", "", { secret: true }) || "";
+const ZEPTO_BASE_URL = envValue("ZEPTO_BASE_URL", "https://api.zeptomail.com/v1.1/as/email");
+const ZEPTO_FROM_ADDRESS = envValue("ZEPTO_FROM_ADDRESS", SES_FROM_ADDRESS || DEFAULT_FROM_ADDRESS, {
+  secret: true,
+});
+const ZEPTO_BOUNCE_ADDRESS = envValue("ZEPTO_BOUNCE_ADDRESS", "", { secret: true });
+const ZEPTO_REPLY_TO = envValue("ZEPTO_REPLY_TO", "", { secret: true });
+const ZEPTO_QUOTA_PER_MINUTE = parseInt(envValue("ZEPTO_QUOTA_PER_MINUTE", "60"), 10);
+const ZEPTO_QUOTA_PER_DAY = parseInt(envValue("ZEPTO_QUOTA_PER_DAY", "1000"), 10);
 
 if (AWS_ACCESS_KEY_ID) process.env.AWS_ACCESS_KEY_ID = AWS_ACCESS_KEY_ID;
 if (AWS_SECRET_ACCESS_KEY) process.env.AWS_SECRET_ACCESS_KEY = AWS_SECRET_ACCESS_KEY;
@@ -191,6 +207,7 @@ async function ensureDataFiles() {
   if (!(await fs.pathExists(mailProvidersFilePath))) {
     await writeJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
   }
+  await ensureDefaultZeptoProvider();
 }
 
 const DATA_KEY_BUFFER = Buffer.from(DATA_OBFUSCATION_KEY || "nodeemail");
@@ -332,9 +349,10 @@ function attemptRecipientRepair(rawValue) {
 }
 
 function normalizeRecipients(recipients = []) {
-  return flattenRecipientInput(recipients)
+  const normalized = flattenRecipientInput(recipients)
     .map((r) => attemptRecipientRepair(String(r).trim().toLowerCase()))
     .filter(Boolean);
+  return Array.from(new Set(normalized));
 }
 
 function isValidEmail(recipient) {
@@ -465,6 +483,35 @@ async function saveMailProviderPool(pool) {
   await writeJson(mailProvidersFilePath, pool);
 }
 
+async function ensureDefaultZeptoProvider() {
+  if (!ZEPTO_API_KEY || !ZEPTO_FROM_ADDRESS) return;
+  const pool = await loadMailProviderPool();
+  const alreadyExists = pool.providers.some(
+    (provider) =>
+      provider.type === "zepto" &&
+      provider.config &&
+      (provider.config.apiKey === ZEPTO_API_KEY ||
+        provider.config.fromAddress?.toLowerCase() === ZEPTO_FROM_ADDRESS.toLowerCase())
+  );
+  if (alreadyExists) return;
+  const provider = normalizeMailProvider({
+    name: "ZeptoMail API",
+    type: "zepto",
+    enabled: true,
+    quotaPerMinute: ZEPTO_QUOTA_PER_MINUTE,
+    quotaPerDay: ZEPTO_QUOTA_PER_DAY,
+    config: {
+      apiKey: ZEPTO_API_KEY,
+      baseUrl: ZEPTO_BASE_URL,
+      fromAddress: ZEPTO_FROM_ADDRESS,
+      replyTo: ZEPTO_REPLY_TO || undefined,
+      bounceAddress: ZEPTO_BOUNCE_ADDRESS || undefined,
+    },
+  });
+  pool.providers.push(provider);
+  await saveMailProviderPool(pool);
+}
+
 function ensureProviderUsage(provider, now = Date.now()) {
   let mutated = false;
   provider.usage = normalizeProviderUsage(provider.usage);
@@ -544,6 +591,9 @@ async function dispatchWithProvider(provider, job, batch) {
   if (type === "zoho") {
     return sendBatchWithZoho(job, batch, config);
   }
+  if (type === "zepto") {
+    return sendBatchWithZepto(job, batch, config);
+  }
   if (type === "ses") {
     const proxy = config.proxy || null;
     return sendBatchWithSes(job, batch, proxy, config);
@@ -596,6 +646,12 @@ function validateProviderConfig(type, config = {}) {
     const required = ["accountId", "clientId", "clientSecret", "refreshToken", "fromAddress"];
     const missing = required.filter((key) => !config[key]);
     if (missing.length) return `Zoho provider missing: ${missing.join(", ")}`;
+    return null;
+  }
+  if (type === "zepto") {
+    const required = ["apiKey", "fromAddress"];
+    const missing = required.filter((key) => !config[key]);
+    if (missing.length) return `ZeptoMail provider missing: ${missing.join(", ")}`;
     return null;
   }
   if (type === "ses") {
@@ -857,6 +913,149 @@ async function sendBatchWithZoho(job, batch, config = {}) {
       errorDetails: [{ message: err.message }],
     };
   }
+}
+
+async function sendBatchWithZepto(job, batch, config = {}) {
+  const apiKey = config.apiKey || config.token || ZEPTO_API_KEY;
+  if (!apiKey) {
+    return {
+      success: false,
+      sent: 0,
+      failed: batch.length,
+      recipients: batch,
+      transport: "zepto",
+      error: "ZeptoMail API key is not configured",
+      errorDetails: [{ message: "ZeptoMail API key is not configured" }],
+    };
+  }
+  const fromAddress = config.fromAddress || job.from || ZEPTO_FROM_ADDRESS;
+  if (!fromAddress) {
+    return {
+      success: false,
+      sent: 0,
+      failed: batch.length,
+      recipients: batch,
+      transport: "zepto",
+      error: "No from address configured for ZeptoMail provider",
+      errorDetails: [{ message: "No from address configured for ZeptoMail provider" }],
+    };
+  }
+  const endpoint = config.baseUrl || ZEPTO_BASE_URL;
+  const replyToAddress = job.replyTo || config.replyTo || ZEPTO_REPLY_TO;
+  const bounceAddress = config.bounceAddress || ZEPTO_BOUNCE_ADDRESS || undefined;
+  const fromName = job.fromName || job.from || "Mailer";
+  const originalHtml = job.htmlBody || "";
+  const htmlBody = (() => {
+    const normalized = originalHtml.replace(/\r\n/g, "\n");
+    if (!normalized.trim()) return "";
+    const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(normalized);
+    if (looksLikeHtml) return normalized;
+    return normalized.split("\n").map((line) => line || "<br>").join("<br>");
+  })();
+  const textBodyRaw =
+    job.textBody && job.textBody.trim().length
+      ? job.textBody
+      : job.htmlBody
+        ? stripHtml(job.htmlBody)
+        : "";
+  const textBody = textBodyRaw.replace(/\r\n/g, "\n");
+  const payloads = batch.map((address) => {
+    const entry = {
+      from: {
+        address: fromAddress,
+        name: fromName,
+      },
+      to: [
+        {
+          email_address: {
+            address,
+            name: address,
+          },
+        },
+      ],
+      subject: job.subject || "",
+      htmlbody: htmlBody || undefined,
+      textbody: textBody || undefined,
+    };
+    if (replyToAddress) {
+      entry.reply_to = [
+        {
+          address: replyToAddress,
+          name: fromName,
+        },
+      ];
+    }
+    if (bounceAddress) {
+      entry.bounce_address = bounceAddress;
+    }
+    return entry;
+  });
+  const authHeader = /^zoho-enczapikey/i.test(apiKey.trim())
+    ? apiKey.trim()
+    : `Zoho-enczapikey ${apiKey.trim()}`;
+
+  const results = {
+    sent: 0,
+    failed: 0,
+    errorDetails: [],
+  };
+
+  for (const entry of payloads) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(entry),
+      });
+      const rawBody = await response.text();
+      let data = null;
+      if (rawBody) {
+        try {
+          data = JSON.parse(rawBody);
+        } catch (err) {
+          data = rawBody;
+        }
+      }
+      if (!response.ok) {
+        const payloadMessage =
+          data && typeof data === "object" && !Array.isArray(data)
+            ? data.message || data.error || null
+            : null;
+        const message =
+          payloadMessage ||
+          (data && typeof data === "object" ? JSON.stringify(data) : rawBody || response.statusText);
+        results.failed += 1;
+        results.errorDetails.push({
+          message,
+          response: data,
+          raw: rawBody,
+          recipient: entry.to?.[0]?.email_address?.address,
+        });
+      } else {
+        results.sent += 1;
+      }
+    } catch (err) {
+      results.failed += 1;
+      results.errorDetails.push({
+        message: err.message,
+        recipient: entry.to?.[0]?.email_address?.address,
+      });
+    }
+  }
+
+  return {
+    success: results.failed === 0,
+    sent: results.sent,
+    failed: results.failed,
+    recipients: batch,
+    transport: "zepto",
+    error: results.failed ? results.errorDetails[0]?.message : undefined,
+    errorDetails: results.errorDetails,
+  };
 }
 
 function runGitCommand(command, logs, { allowFailure = false } = {}) {

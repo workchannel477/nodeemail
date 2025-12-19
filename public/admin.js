@@ -199,6 +199,15 @@ const adminAppDefinition = () => ({
           mailHost: ''
         };
       }
+      if (type === 'zepto') {
+        return {
+          apiKey: '',
+          baseUrl: 'https://api.zeptomail.com/v1.1/as/email',
+          fromAddress: '',
+          replyTo: '',
+          bounceAddress: ''
+        };
+      }
       return {
         fromAddress: '',
         host: '',
@@ -229,6 +238,15 @@ const adminAppDefinition = () => ({
           { key: 'fromAddress', label: 'From address', type: 'email' },
           { key: 'accountsHost', label: 'Accounts host (optional)', type: 'text' },
           { key: 'mailHost', label: 'Mail host (optional)', type: 'text' }
+        ];
+      }
+      if (type === 'zepto') {
+        return [
+          { key: 'apiKey', label: 'API key', type: 'password' },
+          { key: 'fromAddress', label: 'From address', type: 'email' },
+          { key: 'baseUrl', label: 'API URL', type: 'text' },
+          { key: 'replyTo', label: 'Reply-To (optional)', type: 'email' },
+          { key: 'bounceAddress', label: 'Feedback/Bounce email (optional)', type: 'email' }
         ];
       }
       return [

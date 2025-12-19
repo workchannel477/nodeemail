@@ -441,7 +441,8 @@ http://host:port"></textarea>
                               :class="{
                                 'bg-emerald-100 text-emerald-800': provider.type === 'zoho',
                                 'bg-yellow-100 text-yellow-800': provider.type === 'ses',
-                                'bg-blue-100 text-blue-800': provider.type === 'smtp'
+                                'bg-blue-100 text-blue-800': provider.type === 'smtp',
+                                'bg-indigo-100 text-indigo-800': provider.type === 'zepto'
                               }"
                               x-text="provider.type?.toUpperCase()"></span>
                       </td>
@@ -707,6 +708,7 @@ http://host:port"></textarea>
                   <option value="smtp">SMTP</option>
                   <option value="ses">AWS SES (HTTPS)</option>
                   <option value="zoho">Zoho Mail API</option>
+                  <option value="zepto">ZeptoMail API</option>
                 </select>
               </div>
             </div>
