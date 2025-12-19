@@ -31,6 +31,21 @@ Full-stack email sender rebuilt to run with a Node.js/Express API (cPanel-compat
 - `POST /api/jobs` and `PUT /api/jobs/:id` accept an `attachments` array. Each entry must include `filename`, base64 `content`, and an optional `encoding` (defaults to `base64`) plus optional `contentType`.
 - Attachments are persisted with the job payload (base64 inside `data/email-jobs.json`). During dispatch they're converted back to buffers and forwarded to Zoho (multipart/form-data), SES (raw email via Nodemailer), or SMTP (Nodemailer) so every transport can deliver identical payloads.
 
+### Replaying legacy Zoho jobs
+- Use the admin-only API `POST /admin/jobs/replay` to re-send previously delivered jobs through the new provider pool. Request body:
+  ```json
+  {
+    "transport": "zoho",       // filter by last-known transport (set `null` to replay everything)
+    "statuses": ["sent"],      // job statuses to include
+    "limit": 10,               // optional cap on number of jobs
+    "dryRun": true,            // when true, just preview matches
+    "includeUnknown": true     // also replay jobs that predate transport metadata
+  }
+  ```
+- A CLI helper is available via `npm run replay:zoho` (configurable through `REPLAY_API_BASE`, `REPLAY_ADMIN_USER`, `REPLAY_ADMIN_PASS`, `REPLAY_TRANSPORT`, `REPLAY_LIMIT`, `REPLAY_DRY_RUN`, or matching `--api`, `--username`, `--password`, `--transport`, `--limit`, `--dry-run` flags). The script logs in via `/auth/login` and calls the replay endpoint, so the API must be running.
+- End-users can replay a single job they own via `POST /api/jobs/{jobId}/replay` (the dashboard’s Retry/Resend button now uses this route). This resets the job state and dispatches it through the current provider rotation without requiring admin privileges.
+- Jobs now store `transportHint`, `lastTransport`, and provider snapshots, so future replays only touch batches previously dispatched via Zoho (or whichever provider you choose).
+
 ## Local quick start (Node)
 1) Install Node 18+.  
 2) `npm install`  

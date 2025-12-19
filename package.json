@@ -9,7 +9,8 @@
     "clean": "node scripts/clean.js",
     "api": "node api/server.js",
     "api:dev": "nodemon api/server.js",
-    "start": "node api/server.js"
+    "start": "node api/server.js",
+    "replay:zoho": "node scripts/replay-zoho-jobs.js"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.695.0",

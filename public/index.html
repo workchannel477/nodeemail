@@ -185,9 +185,10 @@
                                     @click="triggerSend(job.id)"
                                     :disabled="(job.status === 'sending' || job.status === 'sent')">Send</button>
                             <button class="px-3 py-1 bg-amber-500 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
-                                    x-show="job.status === 'failed'"
-                                    @click="retryJob(job.id)">
-                              Retry
+                                    x-show="job.status === 'failed' || job.status === 'sent'"
+                                    :disabled="job.status === 'sending'"
+                                    @click="retryJob(job)">
+                              <span x-text="job.status === 'sent' ? 'Resend' : 'Retry'"></span>
                             </button>
                             <button class="px-3 py-1 bg-slate-600 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
                                     @click="editJob(job)"

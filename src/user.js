@@ -207,8 +207,28 @@ document.addEventListener('alpine:init', () => {
         this.error = error.message;
       }
     },
-    retryJob(id) {
-      return this.triggerSend(id);
+    async retryJob(job) {
+      const jobData = typeof job === 'object' ? job : (this.jobs.find((j) => j.id === job) || {});
+      const jobId = jobData.id || job;
+      if (!jobId) return;
+      const isResend = (jobData.status || '').toLowerCase() === 'sent';
+      const promptMessage = isResend
+        ? 'Resend this completed job using the updated mail APIs?'
+        : 'Retry this job now?';
+      if (!confirm(promptMessage)) return;
+      try {
+        const response = await fetch(apiUrl(`/api/jobs/${jobId}/replay`), {
+          method: 'POST',
+          headers: this.headers()
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to retry job');
+        this.message = data.message;
+        setTimeout(() => (this.message = ''), 4000);
+        await Promise.all([this.fetchJobs(), this.loadActivity(true)]);
+      } catch (error) {
+        this.error = error.message;
+      }
     },
     async deleteJob(id) {
       if (!confirm('Delete this job?')) return;

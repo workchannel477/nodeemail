@@ -17,6 +17,59 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const ENV_ALIASES = {
+  PORT: ["APP_PORT", "PORT"],
+  SECRET_KEY: ["APP_SIGMA", "SECRET_KEY"],
+  SESSION_TIMEOUT: ["APP_TAU", "SESSION_TIMEOUT"],
+  MAX_REQUESTS_PER_MINUTE: ["APP_REQ_RATE", "MAX_REQUESTS_PER_MINUTE"],
+  MAX_EMAILS_PER_MINUTE: ["APP_MAIL_CAP", "MAX_EMAILS_PER_MINUTE"],
+  EMAIL_BATCH_SIZE: ["APP_BATCH", "EMAIL_BATCH_SIZE"],
+  SMTP_CONNECTION_TIMEOUT_MS: ["APP_SMTP_CONN", "SMTP_CONNECTION_TIMEOUT_MS"],
+  SMTP_SOCKET_TIMEOUT_MS: ["APP_SMTP_SOCKET", "SMTP_SOCKET_TIMEOUT_MS"],
+  MAIL_TRANSPORT: ["APP_MAIL_TRANSPORT", "MAIL_TRANSPORT"],
+  ZOHO_DOMAIN: ["APP_ZOHO_DOMAIN", "ZOHO_DOMAIN"],
+  ZOHO_CLIENT_ID: ["APP_ZOHO_CLIENT_ID", "ZOHO_CLIENT_ID"],
+  ZOHO_CLIENT_SECRET: ["APP_ZOHO_CLIENT_SECRET", "ZOHO_CLIENT_SECRET"],
+  ZOHO_REFRESH_TOKEN: ["APP_ZOHO_REFRESH", "ZOHO_REFRESH_TOKEN"],
+  ZOHO_FROM_ADDRESS: ["APP_ZOHO_FROM", "ZOHO_FROM_ADDRESS"],
+  ZOHO_ACCOUNT_ID: ["APP_ZOHO_ACCOUNT", "ZOHO_ACCOUNT_ID"],
+  ZOHO_ACCOUNTS_HOST: ["APP_ZOHO_AUTH", "ZOHO_ACCOUNTS_HOST"],
+  ZOHO_MAIL_HOST: ["APP_ZOHO_MAIL", "ZOHO_MAIL_HOST"],
+  SES_FROM: ["APP_SES_FROM", "SES_FROM"],
+  DEFAULT_FROM: ["APP_DEFAULT_FROM", "DEFAULT_FROM"],
+  AWS_REGION: ["APP_AWS_REGION", "AWS_REGION"],
+  AWS_ACCESS_KEY_ID: ["APP_AWS_ACCESS", "AWS_ACCESS_KEY_ID"],
+  AWS_SECRET_ACCESS_KEY: ["APP_AWS_SECRET", "AWS_SECRET_ACCESS_KEY"],
+  DEFAULT_SMTP_HOST: ["APP_SMTP_HOST", "DEFAULT_SMTP_HOST"],
+  DEFAULT_SMTP_PORT: ["APP_SMTP_PORT", "DEFAULT_SMTP_PORT"],
+  DATA_OBFUSCATION_KEY: ["APP_DATA_MASK", "DATA_OBFUSCATION_KEY"],
+};
+
+function decodeSecretValue(raw) {
+  if (raw == null) return raw;
+  if (raw.startsWith("enc:")) {
+    const payload = raw.slice(4);
+    try {
+      return Buffer.from(payload, "base64").toString("utf8");
+    } catch (err) {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function envValue(name, fallback, { secret = false } = {}) {
+  const keys = ENV_ALIASES[name] || [name];
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(process.env, key)) {
+      const raw = process.env[key];
+      const value = secret ? decodeSecretValue(raw) : raw;
+      return value;
+    }
+  }
+  return fallback;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, "..");
@@ -34,25 +87,37 @@ const mailProvidersFilePath = path.join(dataDir, "mail-providers.json");
 const activityLogPath = path.join(dataDir, "activity-log.json");
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = parseInt(envValue("PORT", "5001"), 10);
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const MAX_REQUESTS_PER_MINUTE = parseInt(process.env.MAX_REQUESTS_PER_MINUTE || "60", 10);
-const EMAIL_RATE_LIMIT = parseInt(process.env.MAX_EMAILS_PER_MINUTE || "10", 10);
-const BATCH_SIZE_DEFAULT = parseInt(process.env.EMAIL_BATCH_SIZE || "50", 10);
+const MAX_REQUESTS_PER_MINUTE = parseInt(envValue("MAX_REQUESTS_PER_MINUTE", "60"), 10);
+const EMAIL_RATE_LIMIT = parseInt(envValue("MAX_EMAILS_PER_MINUTE", "10"), 10);
+const BATCH_SIZE_DEFAULT = parseInt(envValue("EMAIL_BATCH_SIZE", "50"), 10);
 const SMTP_ROTATE_AFTER_DEFAULT = 200;
-const SMTP_CONNECTION_TIMEOUT_MS = parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || "15000", 10);
-const SMTP_SOCKET_TIMEOUT_MS = parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || "20000", 10);
+const SMTP_CONNECTION_TIMEOUT_MS = parseInt(envValue("SMTP_CONNECTION_TIMEOUT_MS", "15000"), 10);
+const SMTP_SOCKET_TIMEOUT_MS = parseInt(envValue("SMTP_SOCKET_TIMEOUT_MS", "20000"), 10);
 const DATA_SYNC_DEFAULT_MESSAGE = "chore: sync data folder";
-const MAIL_TRANSPORT = (process.env.MAIL_TRANSPORT || "smtp").toLowerCase();
-const ZOHO_DOMAIN = process.env.ZOHO_DOMAIN || "zoho.com";
-const ZOHO_CLIENT_ID = process.env.ZOHO_CLIENT_ID || "";
-const ZOHO_CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET || "";
-const ZOHO_REFRESH_TOKEN = process.env.ZOHO_REFRESH_TOKEN || "";
-const ZOHO_FROM_ADDRESS = process.env.ZOHO_FROM_ADDRESS || process.env.SES_FROM || process.env.DEFAULT_FROM;
-const ZOHO_ACCOUNT_ID = process.env.ZOHO_ACCOUNT_ID || "";
-const ZOHO_ACCOUNTS_HOST = process.env.ZOHO_ACCOUNTS_HOST || `accounts.${ZOHO_DOMAIN}`;
-const ZOHO_MAIL_HOST = process.env.ZOHO_MAIL_HOST || `mail.${ZOHO_DOMAIN}`;
+const MAIL_TRANSPORT = (envValue("MAIL_TRANSPORT", "smtp") || "smtp").toLowerCase();
+const ZOHO_DOMAIN = envValue("ZOHO_DOMAIN", "zoho.com");
+const ZOHO_CLIENT_ID = envValue("ZOHO_CLIENT_ID", "", { secret: true }) || "";
+const ZOHO_CLIENT_SECRET = envValue("ZOHO_CLIENT_SECRET", "", { secret: true }) || "";
+const ZOHO_REFRESH_TOKEN = envValue("ZOHO_REFRESH_TOKEN", "", { secret: true }) || "";
+const DEFAULT_FROM_ADDRESS = envValue("DEFAULT_FROM", undefined, { secret: true });
+const SES_FROM_ADDRESS = envValue("SES_FROM", DEFAULT_FROM_ADDRESS, { secret: true });
+const ZOHO_FROM_ADDRESS = envValue("ZOHO_FROM_ADDRESS", SES_FROM_ADDRESS, { secret: true });
+const ZOHO_ACCOUNT_ID = envValue("ZOHO_ACCOUNT_ID", "", { secret: true }) || "";
+const ZOHO_ACCOUNTS_HOST = envValue("ZOHO_ACCOUNTS_HOST", `accounts.${ZOHO_DOMAIN}`);
+const ZOHO_MAIL_HOST = envValue("ZOHO_MAIL_HOST", `mail.${ZOHO_DOMAIN}`);
+const AWS_REGION = envValue("AWS_REGION", "us-east-1");
+const AWS_ACCESS_KEY_ID = envValue("AWS_ACCESS_KEY_ID", "", { secret: true });
+const AWS_SECRET_ACCESS_KEY = envValue("AWS_SECRET_ACCESS_KEY", "", { secret: true });
+const DEFAULT_SMTP_HOST = envValue("DEFAULT_SMTP_HOST", "email-smtp.us-east-1.amazonaws.com");
+const DEFAULT_SMTP_PORT = parseInt(envValue("DEFAULT_SMTP_PORT", "587"), 10);
+const DATA_OBFUSCATION_KEY = envValue("DATA_OBFUSCATION_KEY", "nodeemail", { secret: true }) || "nodeemail";
+const SESSION_TIMEOUT_SECONDS = parseInt(envValue("SESSION_TIMEOUT", "3600"), 10);
+
+if (AWS_ACCESS_KEY_ID) process.env.AWS_ACCESS_KEY_ID = AWS_ACCESS_KEY_ID;
+if (AWS_SECRET_ACCESS_KEY) process.env.AWS_SECRET_ACCESS_KEY = AWS_SECRET_ACCESS_KEY;
 
 const sessions = new Map();
 const apiRate = new Map();
@@ -86,7 +151,7 @@ async function ensureDataFiles() {
   await fs.ensureDir(recipientsDir);
   if (!(await fs.pathExists(authFilePath))) {
     const salt = cryptoSalt();
-    await fs.writeJson(authFilePath, {
+    await writeJson(authFilePath, {
       users: [
         {
           id: "admin",
@@ -103,16 +168,16 @@ async function ensureDataFiles() {
     });
   }
   if (!(await fs.pathExists(jobsFilePath))) {
-    await fs.writeJson(jobsFilePath, { jobs: [] });
+    await writeJson(jobsFilePath, { jobs: [] });
   }
   if (!(await fs.pathExists(ipRotationFilePath))) {
-    await fs.writeJson(ipRotationFilePath, { proxies: [], currentIndex: 0 });
+    await writeJson(ipRotationFilePath, { proxies: [], currentIndex: 0 });
   }
   if (!(await fs.pathExists(rateLimitFilePath))) {
-    await fs.writeJson(rateLimitFilePath, { limits: {} });
+    await writeJson(rateLimitFilePath, { limits: {} });
   }
   if (!(await fs.pathExists(smtpPoolFilePath))) {
-    await fs.writeJson(smtpPoolFilePath, {
+    await writeJson(smtpPoolFilePath, {
       servers: [],
       currentIndex: 0,
       sentSinceRotation: 0,
@@ -121,19 +186,65 @@ async function ensureDataFiles() {
     });
   }
   if (!(await fs.pathExists(activityLogPath))) {
-    await fs.writeJson(activityLogPath, { entries: [] });
+    await writeJson(activityLogPath, { entries: [] });
   }
   if (!(await fs.pathExists(mailProvidersFilePath))) {
-    await fs.writeJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
+    await writeJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
   }
+}
+
+const DATA_KEY_BUFFER = Buffer.from(DATA_OBFUSCATION_KEY || "nodeemail");
+
+function xorBuffer(buffer, keyBuffer) {
+  const out = Buffer.alloc(buffer.length);
+  for (let i = 0; i < buffer.length; i += 1) {
+    out[i] = buffer[i] ^ keyBuffer[i % keyBuffer.length];
+  }
+  return out;
+}
+
+function obfuscatePayload(value) {
+  const json = JSON.stringify(value);
+  const jsonBuffer = Buffer.from(json, "utf8");
+  const scrambled = xorBuffer(jsonBuffer, DATA_KEY_BUFFER.length ? DATA_KEY_BUFFER : Buffer.from("nodeemail"));
+  return scrambled.toString("base64");
+}
+
+function revealPayload(encoded) {
+  const buffer = Buffer.from(encoded, "base64");
+  const plain = xorBuffer(buffer, DATA_KEY_BUFFER.length ? DATA_KEY_BUFFER : Buffer.from("nodeemail"));
+  return JSON.parse(plain.toString("utf8"));
+}
+
+function wrapObfuscated(value) {
+  return {
+    __obf: true,
+    __v: 1,
+    __data: obfuscatePayload(value),
+  };
+}
+
+function unwrapObfuscated(parsed) {
+  if (parsed && parsed.__obf && parsed.__data) {
+    try {
+      return revealPayload(parsed.__data);
+    } catch (err) {
+      return parsed;
+    }
+  }
+  return parsed;
 }
 
 async function readJson(filePath, fallback = {}) {
   try {
-    return await fs.readJson(filePath);
+    const raw = await fs.readFile(filePath, "utf8");
+    if (!raw.trim()) return fallback;
+    const parsed = JSON.parse(raw);
+    const unwrapped = unwrapObfuscated(parsed);
+    return unwrapped;
   } catch (err) {
     if (err.code === "ENOENT") {
-      await fs.writeJson(filePath, fallback);
+      await writeJson(filePath, fallback);
       return fallback;
     }
     throw err;
@@ -141,7 +252,8 @@ async function readJson(filePath, fallback = {}) {
 }
 
 async function writeJson(filePath, value) {
-  await fs.writeJson(filePath, value, { spaces: 2 });
+  const wrapped = wrapObfuscated(value);
+  await fs.outputFile(filePath, JSON.stringify(wrapped));
 }
 
 function hashPassword(password, salt) {
@@ -158,14 +270,14 @@ function recipientsFile(jobId) {
 
 async function saveRecipients(jobId, recipients = []) {
   const list = normalizeRecipients(recipients);
-  await fs.writeJson(recipientsFile(jobId), { recipients: list }, { spaces: 0 });
+  await writeJson(recipientsFile(jobId), { recipients: list });
 }
 
 async function loadRecipients(job) {
   const collected = [];
   // Prefer stored file
   try {
-    const data = await fs.readJson(recipientsFile(job.id));
+    const data = await readJson(recipientsFile(job.id), { recipients: [] });
     if (Array.isArray(data.recipients)) collected.push(...data.recipients);
   } catch (err) {
     // ignore
@@ -178,7 +290,7 @@ async function loadRecipients(job) {
 
 async function loadRecipientsPreview(jobId, limit = 5, fallbackList = []) {
   try {
-    const data = await fs.readJson(recipientsFile(jobId));
+    const data = await readJson(recipientsFile(jobId), { recipients: [] });
     const list = Array.isArray(data.recipients) ? data.recipients : [];
     return { recipientsPreview: list.slice(0, limit), recipientsCount: list.length };
   } catch (err) {
@@ -188,6 +300,7 @@ async function loadRecipientsPreview(jobId, limit = 5, fallbackList = []) {
 }
 
 const RECIPIENT_DELIMITER_REGEX = /[\s,;|:]+/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 function flattenRecipientInput(value) {
   if (value == null) return [];
@@ -200,10 +313,42 @@ function flattenRecipientInput(value) {
   return [value];
 }
 
+function attemptRecipientRepair(rawValue) {
+  const input = (rawValue || "").trim().toLowerCase();
+  if (!input || input.includes("@")) return input;
+  const compact = input.replace(/\s+/g, "");
+  if (!compact.includes(".")) return input;
+  const parts = compact.split(".").filter(Boolean);
+  if (parts.length < 3) return input;
+  const tld = parts.pop();
+  const domainLabel = parts.pop();
+  if (!domainLabel || !tld) return input;
+  const local = parts.join(".");
+  if (!local) return input;
+  const domain = `${domainLabel}.${tld}`;
+  const candidate = `${local}@${domain}`;
+  if (!EMAIL_PATTERN.test(candidate)) return input;
+  return candidate;
+}
+
 function normalizeRecipients(recipients = []) {
   return flattenRecipientInput(recipients)
-    .map((r) => String(r).trim().toLowerCase())
+    .map((r) => attemptRecipientRepair(String(r).trim().toLowerCase()))
     .filter(Boolean);
+}
+
+function isValidEmail(recipient) {
+  return EMAIL_PATTERN.test(recipient);
+}
+
+function splitRecipientList(list = []) {
+  const valid = [];
+  const invalid = [];
+  for (const entry of list) {
+    if (isValidEmail(entry)) valid.push(entry);
+    else invalid.push(entry);
+  }
+  return { valid, invalid };
 }
 
 async function readActivityLog() {
@@ -248,11 +393,13 @@ function summarizeSend(job, result) {
   return `Sent ${result?.sent || 0}/${total || 0} emails`;
 }
 
-async function recordActivity(job, result, errorMessage) {
+async function recordActivity(job, result, errorMessage, transportMeta) {
   const summaryMessage = errorMessage || extractResultError(result) || summarizeSend(job, result);
   const flattenedDetails = Array.isArray(result?.results)
     ? result.results.flatMap((batch) => batch.errorDetails || []).slice(0, 20)
     : [];
+  const transportDetails = transportMeta || summarizeTransportDetails(result);
+  const entryTransport = job.lastTransport || transportDetails.lastTransport || determineJobTransport(job);
   const entry = {
     id: uuid(),
     jobId: job.id,
@@ -265,7 +412,14 @@ async function recordActivity(job, result, errorMessage) {
     message: summaryMessage,
     timestamp: new Date().toISOString(),
     errorDetails: flattenedDetails,
+    transport: entryTransport,
   };
+  if (transportDetails?.transports?.length) {
+    entry.transports = transportDetails.transports.slice(-20);
+  }
+  if (transportDetails?.lastProvider) {
+    entry.provider = transportDetails.lastProvider;
+  }
   await appendActivityLog(entry);
 }
 
@@ -552,6 +706,58 @@ function normalizeAttachmentPayloadForStorage(attachments) {
       };
     })
     .filter(Boolean);
+}
+
+function determineJobTransport(job = {}) {
+  return (
+    job.lastTransport ||
+    job.transportHint ||
+    (job.smtpUsername || job.smtpPassword || job.smtpHost ? "smtp" : MAIL_TRANSPORT)
+  );
+}
+
+function storedJobTransport(job = {}) {
+  return job.lastTransport || job.transportHint || null;
+}
+
+function summarizeTransportDetails(result) {
+  const transports = [];
+  const providers = [];
+  if (Array.isArray(result?.results)) {
+    for (const batch of result.results) {
+      if (batch?.transport) transports.push(batch.transport);
+      if (batch?.provider) providers.push(batch.provider);
+    }
+  }
+  return {
+    transports,
+    providers,
+    lastTransport: transports.length ? transports[transports.length - 1] : null,
+    lastProvider: providers.length ? providers[providers.length - 1] : null,
+  };
+}
+
+function mergeTransportHistory(existing = [], additions = []) {
+  const merged = [...(existing || []), ...(additions || [])].slice(-50);
+  return merged;
+}
+
+function resetJobForReplay(job) {
+  job.status = "pending";
+  job.sentCount = 0;
+  job.failedCount = 0;
+  delete job.error;
+  delete job.lastResult;
+  delete job.lastSentAt;
+  job.updatedAt = new Date().toISOString();
+}
+
+async function replayExistingJob(job, payload, options = {}) {
+  resetJobForReplay(job);
+  const replayOptions = {
+    skipRateLimit: options.skipRateLimit === undefined ? false : options.skipRateLimit,
+  };
+  return dispatchJob(job, payload, replayOptions);
 }
 
 function buildZohoForm(job, recipients, config = {}) {
@@ -861,7 +1067,7 @@ app.post("/auth/login", async (req, res) => {
     username: user.username,
     role: user.role || "user",
     id: user.id,
-    expiresAt: Date.now() + (parseInt(process.env.SESSION_TIMEOUT || "3600", 10) * 1000),
+    expiresAt: Date.now() + SESSION_TIMEOUT_SECONDS * 1000,
   });
   return res.json({
     token,
@@ -1141,9 +1347,24 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   if (!subject || !fromName) {
     return res.status(400).json({ message: "fromName and subject are required" });
   }
-  const recipientList = normalizeRecipients(recipients);
-  if (!recipientList.length) {
+  const recipientListRaw = normalizeRecipients(recipients);
+  if (!recipientListRaw.length) {
     return res.status(400).json({ message: "At least one recipient is required" });
+  }
+  const { valid: recipientList, invalid: invalidRecipients } = splitRecipientList(recipientListRaw);
+  if (!recipientList.length) {
+    return res
+      .status(400)
+      .json({
+        message: invalidRecipients.length
+          ? `All recipients are invalid. Please fix: ${invalidRecipients.slice(0, 5).join(", ")}`
+          : "At least one valid recipient is required",
+      });
+  }
+  if (invalidRecipients.length) {
+    return res
+      .status(400)
+      .json({ message: `Invalid recipient(s): ${invalidRecipients.slice(0, 5).join(", ")}` });
   }
   const owner = req.user.role === "admin" && req.body.owner ? req.body.owner : req.user.username;
   const users = (await readJson(authFilePath, { users: [] })).users || [];
@@ -1169,6 +1390,7 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
     maxRetries: parseInt(maxRetries, 10),
     attachments: storedAttachments,
     status: "pending",
+    transportHint: MAIL_TRANSPORT,
     createdAt: now,
     updatedAt: now,
   };
@@ -1213,9 +1435,24 @@ app.put("/api/jobs/:id", requireAuth, async (req, res) => {
   if (req.user.role !== "admin" && job.owner !== req.user.username) {
     return res.status(403).json({ message: "You cannot edit this job" });
   }
-  const recipientList = normalizeRecipients(recipients);
-  if (!recipientList.length) {
+  const recipientListRaw = normalizeRecipients(recipients);
+  if (!recipientListRaw.length) {
     return res.status(400).json({ message: "At least one recipient is required" });
+  }
+  const { valid: recipientList, invalid: invalidRecipients } = splitRecipientList(recipientListRaw);
+  if (!recipientList.length) {
+    return res
+      .status(400)
+      .json({
+        message: invalidRecipients.length
+          ? `All recipients are invalid. Please fix: ${invalidRecipients.slice(0, 5).join(", ")}`
+          : "At least one valid recipient is required",
+      });
+  }
+  if (invalidRecipients.length) {
+    return res
+      .status(400)
+      .json({ message: `Invalid recipient(s): ${invalidRecipients.slice(0, 5).join(", ")}` });
   }
   job.subject = subject;
   job.fromName = fromName;
@@ -1227,6 +1464,9 @@ app.put("/api/jobs/:id", requireAuth, async (req, res) => {
   job.maxRetries = parseInt(maxRetries || job.maxRetries || 3, 10);
   job.recipientsCount = recipientList.length;
   job.recipientsPreview = recipientList.slice(0, 5);
+  if (!job.transportHint) {
+    job.transportHint = MAIL_TRANSPORT;
+  }
   if (attachments !== undefined) {
     job.attachments = normalizeAttachmentPayloadForStorage(attachments);
   } else if (!Array.isArray(job.attachments)) {
@@ -1303,6 +1543,107 @@ app.delete("/admin/jobs/:id/recipients", requireAuth, requireAdmin, async (req, 
   await writeJson(jobsFilePath, payload);
   await fs.remove(recipientsFile(id));
   res.json({ message: "Recipient log cleared", removed: recipientsCount });
+});
+
+app.post("/api/jobs/:id/replay", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { skipRateLimit = false } = req.body || {};
+  const payload = await readJson(jobsFilePath, { jobs: [] });
+  const job = payload.jobs.find((j) => j.id === id);
+  if (!job) return res.status(404).json({ message: "Job not found" });
+  if (req.user.role !== "admin" && job.owner !== req.user.username) {
+    return res.status(403).json({ message: "You cannot replay this job" });
+  }
+  try {
+    const replayResult = await replayExistingJob(job, payload, { skipRateLimit: Boolean(skipRateLimit) });
+    res.json({
+      message: "Job replay complete",
+      job,
+      result: replayResult,
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message || "Failed to replay job" });
+  }
+});
+
+app.post("/admin/jobs/replay", requireAuth, requireAdmin, async (req, res) => {
+  const {
+    transport = "zoho",
+    statuses,
+    limit,
+    dryRun = false,
+    sort = "asc",
+    includeUnknown,
+  } = req.body || {};
+  const payload = await readJson(jobsFilePath, { jobs: [] });
+  const normalizedStatuses = (Array.isArray(statuses) && statuses.length ? statuses : ["sent"]).map((s) =>
+    String(s || "").toLowerCase()
+  );
+  let candidates = payload.jobs.filter((job) =>
+    normalizedStatuses.includes(String(job.status || "").toLowerCase())
+  );
+  const includeUnknownTransports =
+    includeUnknown !== undefined ? Boolean(includeUnknown) : transport === "zoho";
+  if (transport) {
+    candidates = candidates.filter((job) => {
+      const storedTransport = storedJobTransport(job);
+      if (storedTransport) return storedTransport === transport;
+      return includeUnknownTransports;
+    });
+  }
+  const sortFactor = sort === "desc" ? -1 : 1;
+  candidates.sort((a, b) => {
+    const timeA = new Date(a.updatedAt || a.lastSentAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.updatedAt || b.lastSentAt || b.createdAt || 0).getTime();
+    return (timeA - timeB) * sortFactor;
+  });
+  const selectionLimit = Number(limit) > 0 ? Number(limit) : 0;
+  const selected = selectionLimit ? candidates.slice(0, selectionLimit) : candidates;
+  if (!selected.length) {
+    return res.json({ message: "No jobs matched filter", matched: candidates.length, processed: 0, results: [] });
+  }
+  if (dryRun) {
+    return res.json({
+      message: `Dry run: ${selected.length} job(s) would be replayed`,
+      matched: candidates.length,
+      processed: 0,
+      results: selected.map((job) => ({
+        id: job.id,
+        subject: job.subject,
+        status: job.status,
+        transport: storedJobTransport(job) || determineJobTransport(job),
+        recipientsCount: job.recipientsCount || 0,
+      })),
+    });
+  }
+  const results = [];
+  for (const job of selected) {
+    try {
+      const replayResult = await replayExistingJob(job, payload, { skipRateLimit: true });
+      results.push({
+        id: job.id,
+        subject: job.subject,
+        sent: replayResult.sent,
+        failed: replayResult.failed,
+        transport: job.lastTransport || storedJobTransport(job) || determineJobTransport(job),
+        status: job.status,
+      });
+    } catch (err) {
+      results.push({
+        id: job.id,
+        subject: job.subject,
+        transport: storedJobTransport(job) || determineJobTransport(job),
+        error: err.message,
+      });
+    }
+  }
+  res.json({
+    message: "Replay completed",
+    matched: candidates.length,
+    processed: selected.length,
+    results,
+  });
 });
 
 // ---------- Overview & health ----------
@@ -1420,15 +1761,39 @@ app.get("/healthz", async (_req, res) => {
 
 // ---------- Mailer ----------
 async function sendEmailJob(job) {
-  const recipients = await loadRecipients(job);
-  if (!recipients.length) {
+  const recipientsRaw = await loadRecipients(job);
+  if (!recipientsRaw.length) {
     throw new Error("This job does not have any recipients to send to.");
+  }
+  const { valid: recipients, invalid: invalidRecipients } = splitRecipientList(recipientsRaw);
+  if (!recipients.length) {
+    const invalidMsg = invalidRecipients.length
+      ? `All recipients are invalid. Please fix: ${invalidRecipients.slice(0, 5).join(", ")}`
+      : "This job does not have any valid recipients.";
+    throw new Error(invalidMsg);
   }
   const batchSize = job.batchSize || BATCH_SIZE_DEFAULT;
   const results = [];
   let sentTotal = 0;
   let failedTotal = 0;
   const providersAvailable = await hasEnabledMailProviders();
+  if (invalidRecipients.length) {
+    const invalidDetails = invalidRecipients.map((recipient) => ({
+      recipient,
+      message: "Invalid email address",
+      code: "INVALID_RECIPIENT",
+    }));
+    results.push({
+      success: false,
+      sent: 0,
+      failed: invalidRecipients.length,
+      recipients: invalidRecipients,
+      transport: "validation",
+      error: `Invalid recipient(s): ${invalidRecipients.slice(0, 5).join(", ")}`,
+      errorDetails: invalidDetails,
+    });
+    failedTotal += invalidRecipients.length;
+  }
 
   for (let i = 0; i < recipients.length; i += batchSize) {
     const batch = recipients.slice(i, i + batchSize);
@@ -1483,7 +1848,7 @@ async function sendEmailJob(job) {
 }
 
 async function sendBatchWithSes(job, batch, proxyUrl, sesOptions = {}) {
-  const region = sesOptions.region || process.env.AWS_REGION || "us-east-1";
+  const region = sesOptions.region || AWS_REGION || "us-east-1";
   const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
   const credentials =
     sesOptions.accessKeyId && sesOptions.secretAccessKey
@@ -1497,8 +1862,7 @@ async function sendBatchWithSes(job, batch, proxyUrl, sesOptions = {}) {
     credentials,
     requestHandler: new NodeHttpHandler(agent ? { httpsAgent: agent } : {}),
   });
-  const sourceEmail =
-    sesOptions.fromAddress || process.env.SES_FROM || process.env.DEFAULT_FROM || job.from;
+  const sourceEmail = sesOptions.fromAddress || SES_FROM_ADDRESS || DEFAULT_FROM_ADDRESS || job.from;
   if (!sourceEmail) {
     throw new Error("No FROM email configured. Set SES_FROM or DEFAULT_FROM.");
   }
@@ -1520,6 +1884,10 @@ async function sendBatchWithSes(job, batch, proxyUrl, sesOptions = {}) {
       await transporter.sendMail({
         from: source,
         to: recipient,
+        envelope: {
+          from: sourceEmail,
+          to: recipient,
+        },
         subject: job.subject,
         text: job.textBody || (job.htmlBody ? stripHtml(job.htmlBody) : ""),
         html: job.htmlBody,
@@ -1567,7 +1935,7 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
       job.error = errMsg;
       job.updatedAt = new Date().toISOString();
       await writeJson(jobsFilePath, payload);
-      await recordActivity(job, null, errMsg);
+      await recordActivity(job, null, errMsg, null);
       const rateErr = new Error(errMsg);
       rateErr.statusCode = 429;
       throw rateErr;
@@ -1582,6 +1950,18 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
     job.lastResult = summary;
     job.sentCount = summary.sent;
     job.failedCount = summary.failed;
+    const transportMeta = summarizeTransportDetails(result);
+    if (transportMeta.lastTransport) {
+      job.lastTransport = transportMeta.lastTransport;
+    } else if (!job.lastTransport) {
+      job.lastTransport = determineJobTransport(job);
+    }
+    if (transportMeta.lastProvider) {
+      job.lastProviderSnapshot = transportMeta.lastProvider;
+    }
+    if (transportMeta.transports?.length) {
+      job.transportHistory = mergeTransportHistory(job.transportHistory, transportMeta.transports);
+    }
     const failureMsg = extractResultError(result);
     if (!result.success && failureMsg) {
       job.error = failureMsg;
@@ -1590,14 +1970,14 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
     }
     job.updatedAt = new Date().toISOString();
     await writeJson(jobsFilePath, payload);
-    await recordActivity(job, result);
+    await recordActivity(job, result, null, transportMeta);
     return result;
   } catch (err) {
     job.status = "failed";
     job.error = err.message;
     job.updatedAt = new Date().toISOString();
     await writeJson(jobsFilePath, payload);
-    await recordActivity(job, null, err.message);
+    await recordActivity(job, null, err.message, null);
     throw err;
   }
 }
@@ -1613,8 +1993,8 @@ async function resolveSmtpServerForBatch(job) {
         id: "legacy",
         label: job.smtpUsername,
         from: job.from || job.replyTo || job.smtpUsername,
-        host: job.smtpHost || process.env.DEFAULT_SMTP_HOST || "email-smtp.us-east-1.amazonaws.com",
-        port: parseInt(job.smtpPort || process.env.DEFAULT_SMTP_PORT || "587", 10),
+        host: job.smtpHost || DEFAULT_SMTP_HOST,
+        port: parseInt(job.smtpPort, 10) || DEFAULT_SMTP_PORT,
         username: job.smtpUsername,
         password: job.smtpPassword,
       };
