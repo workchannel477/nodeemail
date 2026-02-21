@@ -695,6 +695,46 @@ async function replayExistingJob(job, payload, options = {}) {
   return dispatchJob(job, payload, replayOptions);
 }
 
+const RESEND_REQUESTS_PER_SECOND_DEFAULT = 2;
+const RESEND_RATE_WINDOW_MS = 1_000;
+const RESEND_RATE_RETRY_DELAY_MS = 600;
+const RESEND_RATE_RETRY_MAX_ATTEMPTS = 2;
+const resendRequestTimestamps = [];
+
+function normalizeResendRequestsPerSecond(value) {
+  const parsed = parseInt(value, 10);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return RESEND_REQUESTS_PER_SECOND_DEFAULT;
+}
+
+async function throttleResendRequest(maxRequestsPerSecond = RESEND_REQUESTS_PER_SECOND_DEFAULT) {
+  const maxRequests = normalizeResendRequestsPerSecond(maxRequestsPerSecond);
+  while (true) {
+    const now = Date.now();
+    while (resendRequestTimestamps.length && now - resendRequestTimestamps[0] >= RESEND_RATE_WINDOW_MS) {
+      resendRequestTimestamps.shift();
+    }
+    if (resendRequestTimestamps.length < maxRequests) {
+      resendRequestTimestamps.push(now);
+      return;
+    }
+    const waitMs = Math.max(25, RESEND_RATE_WINDOW_MS - (now - resendRequestTimestamps[0]) + 10);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+}
+
+function isResendRateLimitError(errLike) {
+  const message = String(errLike?.message || errLike || "").toLowerCase();
+  const code =
+    String(errLike?.statusCode || errLike?.status || errLike?.code || errLike?.name || "").toLowerCase();
+  return (
+    message.includes("too many requests") ||
+    message.includes("rate limit") ||
+    code === "429" ||
+    code.includes("rate")
+  );
+}
+
 async function sendBatchWithResend(job, batch, config = {}) {
   const apiKey = config.apiKey || config.token;
   if (!apiKey) {
@@ -743,6 +783,9 @@ async function sendBatchWithResend(job, batch, config = {}) {
     filename: att.filename,
     content: att.buffer.toString("base64"),
   }));
+  const maxRequestsPerSecond = normalizeResendRequestsPerSecond(
+    config.maxRequestsPerSecond || config.requestsPerSecond
+  );
 
   const results = {
     sent: 0,
@@ -751,33 +794,50 @@ async function sendBatchWithResend(job, batch, config = {}) {
   };
 
   for (const address of batch) {
-    try {
-      const response = await resend.emails.send({
-        from,
-        to: [address],
-        subject: job.subject || "",
-        html: htmlBody || undefined,
-        text: textBody || undefined,
-        replyTo: job.replyTo || config.replyTo || undefined,
-        attachments: attachments.length ? attachments : undefined,
-      });
-      if (response?.error) {
-        const message = response.error.message || "Resend API request failed";
+    let delivered = false;
+    let attempt = 0;
+    while (!delivered && attempt <= RESEND_RATE_RETRY_MAX_ATTEMPTS) {
+      await throttleResendRequest(maxRequestsPerSecond);
+      try {
+        const response = await resend.emails.send({
+          from,
+          to: [address],
+          subject: job.subject || "",
+          html: htmlBody || undefined,
+          text: textBody || undefined,
+          replyTo: job.replyTo || config.replyTo || undefined,
+          attachments: attachments.length ? attachments : undefined,
+        });
+        if (response?.error) {
+          if (isResendRateLimitError(response.error) && attempt < RESEND_RATE_RETRY_MAX_ATTEMPTS) {
+            attempt += 1;
+            await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_RETRY_DELAY_MS * attempt));
+            continue;
+          }
+          const message = response.error.message || "Resend API request failed";
+          results.failed += 1;
+          results.errorDetails.push({
+            recipient: address,
+            message,
+            response: response.error,
+          });
+          break;
+        }
+        results.sent += 1;
+        delivered = true;
+      } catch (err) {
+        if (isResendRateLimitError(err) && attempt < RESEND_RATE_RETRY_MAX_ATTEMPTS) {
+          attempt += 1;
+          await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_RETRY_DELAY_MS * attempt));
+          continue;
+        }
         results.failed += 1;
         results.errorDetails.push({
           recipient: address,
-          message,
-          response: response.error,
+          message: err.message,
         });
-      } else {
-        results.sent += 1;
+        break;
       }
-    } catch (err) {
-      results.failed += 1;
-      results.errorDetails.push({
-        recipient: address,
-        message: err.message,
-      });
     }
   }
 
