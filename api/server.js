@@ -458,10 +458,9 @@ function providerCanSend(provider, batchSize, now = Date.now()) {
   if (provider.quotaPerDay > 0 && provider.usage.sentToday + batchSize > provider.quotaPerDay) {
     return false;
   }
-  if (
-    provider.quotaPerMinute > 0 &&
-    provider.usage.minuteWindow.length + batchSize > provider.quotaPerMinute
-  ) {
+  // Per-minute quota is treated as provider dispatch attempts per minute.
+  // The daily quota remains recipient-count based.
+  if (provider.quotaPerMinute > 0 && provider.usage.minuteWindow.length + 1 > provider.quotaPerMinute) {
     return false;
   }
   return true;
@@ -479,9 +478,7 @@ async function incrementProviderUsage(providerId, increment) {
   if (!provider) return;
   const now = Date.now();
   ensureProviderUsage(provider, now);
-  for (let i = 0; i < increment; i += 1) {
-    provider.usage.minuteWindow.push(now);
-  }
+  provider.usage.minuteWindow.push(now);
   provider.usage.sentToday += increment;
   provider.updatedAt = new Date().toISOString();
   await saveMailProviderPool(pool);
