@@ -315,7 +315,7 @@ http://host:port"></textarea>
                 <div class="space-y-4">
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
-                    <input type="text" x-model="smtpForm.label" placeholder="Mailtrap / SES / Sender"
+                    <input type="text" x-model="smtpForm.label" placeholder="Mailtrap / Postmark / Sender"
                            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div class="grid grid-cols-2 gap-3">
@@ -401,7 +401,7 @@ http://host:port"></textarea>
                 <i class="ti ti-mail-forward text-2xl text-indigo-500"></i>
                 <div>
                   <h2 class="text-xl font-semibold text-gray-800">API & SMTP Providers</h2>
-                  <p class="text-sm text-gray-500">Distribute jobs across Zoho, SES, or custom SMTP APIs with daily/minute quotas.</p>
+                  <p class="text-sm text-gray-500">Distribute jobs across Resend API and SMTP providers with daily/minute quotas.</p>
                 </div>
               </div>
               <button @click="openProviderForm()"
@@ -426,7 +426,7 @@ http://host:port"></textarea>
                   <template x-if="!mailProviders.length">
                     <tr>
                       <td colspan="6" class="px-5 py-8 text-center text-gray-500">
-                        No API providers configured. Add Zoho, SES, or SMTP accounts to enable automatic rotation.
+                        No providers configured. Add Resend or SMTP accounts to enable automatic rotation.
                       </td>
                     </tr>
                   </template>
@@ -439,10 +439,9 @@ http://host:port"></textarea>
                       <td class="px-5 py-4 whitespace-nowrap">
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                               :class="{
-                                'bg-emerald-100 text-emerald-800': provider.type === 'zoho',
-                                'bg-yellow-100 text-yellow-800': provider.type === 'ses',
+                                'bg-sky-100 text-sky-800': provider.type === 'resend',
                                 'bg-blue-100 text-blue-800': provider.type === 'smtp',
-                                'bg-indigo-100 text-indigo-800': provider.type === 'zepto'
+                                'bg-gray-100 text-gray-700': provider.type !== 'resend' && provider.type !== 'smtp'
                               }"
                               x-text="provider.type?.toUpperCase()"></span>
                       </td>
@@ -705,10 +704,8 @@ http://host:port"></textarea>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Provider Type</label>
                 <select x-model="providerForm.type" @change="handleProviderTypeChange"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="resend">Resend API</option>
                   <option value="smtp">SMTP</option>
-                  <option value="ses">AWS SES (HTTPS)</option>
-                  <option value="zoho">Zoho Mail API</option>
-                  <option value="zepto">ZeptoMail API</option>
                 </select>
               </div>
             </div>

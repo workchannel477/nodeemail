@@ -17,7 +17,7 @@ const adminAppDefinition = () => ({
     providerForm: {
       id: null,
       name: '',
-      type: 'smtp',
+      type: 'resend',
       enabled: true,
       quotaPerMinute: 60,
       quotaPerDay: 500,
@@ -179,33 +179,11 @@ const adminAppDefinition = () => ({
     },
 
     providerConfigTemplate(type) {
-      if (type === 'ses') {
-        return {
-          region: '',
-          accessKeyId: '',
-          secretAccessKey: '',
-          fromAddress: '',
-          proxy: ''
-        };
-      }
-      if (type === 'zoho') {
-        return {
-          accountId: '',
-          clientId: '',
-          clientSecret: '',
-          refreshToken: '',
-          fromAddress: '',
-          accountsHost: '',
-          mailHost: ''
-        };
-      }
-      if (type === 'zepto') {
+      if (type === 'resend') {
         return {
           apiKey: '',
-          baseUrl: 'https://api.zeptomail.com/v1.1/as/email',
           fromAddress: '',
-          replyTo: '',
-          bounceAddress: ''
+          replyTo: ''
         };
       }
       return {
@@ -220,33 +198,11 @@ const adminAppDefinition = () => ({
 
     providerConfigFields() {
       const type = this.providerForm.type;
-      if (type === 'ses') {
-        return [
-          { key: 'region', label: 'AWS Region', type: 'text' },
-          { key: 'accessKeyId', label: 'Access Key ID', type: 'text' },
-          { key: 'secretAccessKey', label: 'Secret Access Key', type: 'password' },
-          { key: 'fromAddress', label: 'From address', type: 'email' },
-          { key: 'proxy', label: 'Proxy URL (optional)', type: 'text' }
-        ];
-      }
-      if (type === 'zoho') {
-        return [
-          { key: 'accountId', label: 'Account ID', type: 'text' },
-          { key: 'clientId', label: 'Client ID', type: 'text' },
-          { key: 'clientSecret', label: 'Client Secret', type: 'password' },
-          { key: 'refreshToken', label: 'Refresh Token', type: 'password' },
-          { key: 'fromAddress', label: 'From address', type: 'email' },
-          { key: 'accountsHost', label: 'Accounts host (optional)', type: 'text' },
-          { key: 'mailHost', label: 'Mail host (optional)', type: 'text' }
-        ];
-      }
-      if (type === 'zepto') {
+      if (type === 'resend') {
         return [
           { key: 'apiKey', label: 'API key', type: 'password' },
           { key: 'fromAddress', label: 'From address', type: 'email' },
-          { key: 'baseUrl', label: 'API URL', type: 'text' },
-          { key: 'replyTo', label: 'Reply-To (optional)', type: 'email' },
-          { key: 'bounceAddress', label: 'Feedback/Bounce email (optional)', type: 'email' }
+          { key: 'replyTo', label: 'Reply-To (optional)', type: 'email' }
         ];
       }
       return [
@@ -261,7 +217,7 @@ const adminAppDefinition = () => ({
 
     resetProviderForm(provider = null) {
       if (provider) {
-        const template = this.providerConfigTemplate(provider.type || 'smtp');
+        const template = this.providerConfigTemplate(provider.type || 'resend');
         this.providerForm = {
           id: provider.id,
           name: provider.name,
@@ -275,11 +231,11 @@ const adminAppDefinition = () => ({
         this.providerForm = {
           id: null,
           name: '',
-          type: 'smtp',
+          type: 'resend',
           enabled: true,
           quotaPerMinute: 60,
           quotaPerDay: 500,
-          config: this.providerConfigTemplate('smtp')
+          config: this.providerConfigTemplate('resend')
         };
       }
     },
@@ -795,6 +751,8 @@ const dashboardAppDefinition = () => ({
     editingJobId: null,
     editingJobSubject: '',
     recipientsBusy: false,
+    jobSearch: '',
+    statusFilter: 'all',
     loginForm: { username: '', password: '' },
     form: {
       fromName: '',
@@ -806,10 +764,48 @@ const dashboardAppDefinition = () => ({
     get isAdmin() {
       return this.user && this.user.role === 'admin';
     },
+    get recipientsCount() {
+      return this.estimateRecipients(this.form.recipients).length;
+    },
+    get filteredJobs() {
+      const term = String(this.jobSearch || '').trim().toLowerCase();
+      return (this.jobs || []).filter((job) => {
+        const statusMatch = this.statusFilter === 'all' || (job.status || '').toLowerCase() === this.statusFilter;
+        if (!statusMatch) return false;
+        if (!term) return true;
+        const recipients = Array.isArray(job.recipientsPreview)
+          ? job.recipientsPreview.join(' ')
+          : Array.isArray(job.recipients)
+            ? job.recipients.join(' ')
+            : '';
+        const haystack = [
+          job.subject || '',
+          job.owner || '',
+          job.fromName || '',
+          job.from || '',
+          recipients
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(term);
+      });
+    },
+    get jobStats() {
+      const stats = { total: 0, pending: 0, sending: 0, sent: 0, failed: 0 };
+      for (const job of this.jobs || []) {
+        stats.total += 1;
+        const key = String(job.status || '').toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(stats, key)) {
+          stats[key] += 1;
+        }
+      }
+      return stats;
+    },
     async init() {
       if (this.token) {
         await this.fetchJobs();
         await this.refreshProfile();
+        this.loadDraft();
         await this.loadActivity();
       }
     },
@@ -817,6 +813,71 @@ const dashboardAppDefinition = () => ({
       const headers = { 'Content-Type': 'application/json' };
       if (this.token) headers.Authorization = `Bearer ${this.token}`;
       return headers;
+    },
+    composerDraftKey() {
+      const username = (this.user && this.user.username) || 'guest';
+      return `mailer_job_draft_${username}`;
+    },
+    estimateRecipients(raw = '') {
+      return String(raw || '')
+        .split(/[\s,;\n\r]+/)
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean);
+    },
+    persistDraft() {
+      if (!this.token) return;
+      const payload = {
+        ...this.form,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(this.composerDraftKey(), JSON.stringify(payload));
+    },
+    loadDraft() {
+      if (!this.token) return;
+      const raw = localStorage.getItem(this.composerDraftKey());
+      if (!raw) return;
+      try {
+        const draft = JSON.parse(raw);
+        if (!draft || typeof draft !== 'object') return;
+        this.form.fromName = draft.fromName || this.form.fromName;
+        this.form.replyTo = draft.replyTo || this.form.replyTo;
+        this.form.subject = draft.subject || this.form.subject;
+        this.form.recipients = draft.recipients || this.form.recipients;
+        this.form.htmlBody = draft.htmlBody || this.form.htmlBody;
+      } catch (error) {
+        localStorage.removeItem(this.composerDraftKey());
+      }
+    },
+    clearDraft(resetForm = false) {
+      if (!this.token) return;
+      localStorage.removeItem(this.composerDraftKey());
+      if (resetForm) {
+        Object.keys(this.form).forEach((key) => {
+          this.form[key] = '';
+        });
+        this.editingJobId = null;
+        this.editingJobSubject = '';
+        this.message = 'Draft cleared.';
+        setTimeout(() => {
+          this.message = '';
+        }, 2500);
+      }
+    },
+    insertStarterTemplate() {
+      if (this.form.htmlBody && this.form.htmlBody.trim()) {
+        const overwrite = confirm('Replace current body with a starter template?');
+        if (!overwrite) return;
+      }
+      this.form.htmlBody = [
+        '<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">',
+        '  <h2 style="margin: 0 0 12px;">Hello {{first_name}},</h2>',
+        '  <p style="margin: 0 0 12px;">',
+        '    This is a quick update from our team. Add your campaign details here.',
+        '  </p>',
+        '  <p style="margin: 0;">Best regards,<br>Your Team</p>',
+        '</div>'
+      ].join('\\n');
+      this.persistDraft();
     },
     async login() {
       this.error = '';
@@ -841,6 +902,7 @@ const dashboardAppDefinition = () => ({
         localStorage.setItem('mailer_user', JSON.stringify(this.user));
         this.loginForm.password = '';
         await this.fetchJobs();
+        this.loadDraft();
         await this.loadActivity(true);
       } catch (error) {
         this.error = error.message;
@@ -858,6 +920,9 @@ const dashboardAppDefinition = () => ({
       }
       localStorage.removeItem('mailer_token');
       localStorage.removeItem('mailer_user');
+      if (this.user && this.user.username) {
+        localStorage.removeItem(`mailer_job_draft_${this.user.username}`);
+      }
       this.token = '';
       this.user = null;
       this.jobs = [];
@@ -868,6 +933,11 @@ const dashboardAppDefinition = () => ({
       this.editingJobId = null;
       this.editingJobSubject = '';
       this.recipientsBusy = false;
+      this.jobSearch = '';
+      this.statusFilter = 'all';
+      Object.keys(this.form).forEach((key) => {
+        this.form[key] = '';
+      });
     },
     async refreshProfile() {
       if (!this.token) return;
@@ -925,7 +995,7 @@ const dashboardAppDefinition = () => ({
         const response = await apiFetch(`/api/jobs/${job.id}/recipients`, { headers: this.headers() });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Unable to load recipients');
-        const recipients = Array.isArray(data.recipients) ? data.recipients.join('\n') : '';
+        const recipients = Array.isArray(data.recipients) ? data.recipients.join('\\n') : '';
         this.form.fromName = job.fromName || '';
         this.form.replyTo = job.replyTo || '';
         this.form.subject = job.subject || '';
@@ -933,6 +1003,7 @@ const dashboardAppDefinition = () => ({
         this.form.htmlBody = job.htmlBody || '';
         this.editingJobId = job.id;
         this.editingJobSubject = job.subject;
+        this.persistDraft();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (error) {
         this.error = error.message;
@@ -944,6 +1015,7 @@ const dashboardAppDefinition = () => ({
       this.editingJobId = null;
       this.editingJobSubject = '';
       Object.keys(this.form).forEach((key) => (this.form[key] = ''));
+      this.persistDraft();
     },
     async createJob() {
       this.error = '';
@@ -970,7 +1042,8 @@ const dashboardAppDefinition = () => ({
         Object.keys(this.form).forEach((key) => (this.form[key] = ''));
         this.editingJobId = null;
         this.editingJobSubject = '';
-        this.message = wasEditing ? 'Job updated. Use Send in the actions column when ready.' : 'Job saved. Use Send in the actions column when ready.';
+        this.clearDraft();
+        this.message = wasEditing ? 'Job updated. Use Send when ready.' : 'Job saved. Use Send when ready.';
         setTimeout(() => {
           this.message = '';
         }, 4000);

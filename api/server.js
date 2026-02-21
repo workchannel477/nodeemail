@@ -4,15 +4,11 @@ import path from "path";
 import fs from "fs-extra";
 import { fileURLToPath } from "url";
 import { v4 as uuid } from "uuid";
-import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
-import { NodeHttpHandler } from "@aws-sdk/node-http-handler";
-import { HttpsProxyAgent } from "https-proxy-agent";
+import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { createHash } from "crypto";
 import { execSync } from "child_process";
-import FormData from "form-data";
-import https from "https";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -27,29 +23,12 @@ const ENV_ALIASES = {
   SMTP_CONNECTION_TIMEOUT_MS: ["APP_SMTP_CONN", "SMTP_CONNECTION_TIMEOUT_MS"],
   SMTP_SOCKET_TIMEOUT_MS: ["APP_SMTP_SOCKET", "SMTP_SOCKET_TIMEOUT_MS"],
   MAIL_TRANSPORT: ["APP_MAIL_TRANSPORT", "MAIL_TRANSPORT"],
-  ZOHO_DOMAIN: ["APP_ZOHO_DOMAIN", "ZOHO_DOMAIN"],
-  ZOHO_CLIENT_ID: ["APP_ZOHO_CLIENT_ID", "ZOHO_CLIENT_ID"],
-  ZOHO_CLIENT_SECRET: ["APP_ZOHO_CLIENT_SECRET", "ZOHO_CLIENT_SECRET"],
-  ZOHO_REFRESH_TOKEN: ["APP_ZOHO_REFRESH", "ZOHO_REFRESH_TOKEN"],
-  ZOHO_FROM_ADDRESS: ["APP_ZOHO_FROM", "ZOHO_FROM_ADDRESS"],
-  ZOHO_ACCOUNT_ID: ["APP_ZOHO_ACCOUNT", "ZOHO_ACCOUNT_ID"],
-  ZOHO_ACCOUNTS_HOST: ["APP_ZOHO_AUTH", "ZOHO_ACCOUNTS_HOST"],
-  ZOHO_MAIL_HOST: ["APP_ZOHO_MAIL", "ZOHO_MAIL_HOST"],
-  SES_FROM: ["APP_SES_FROM", "SES_FROM"],
   DEFAULT_FROM: ["APP_DEFAULT_FROM", "DEFAULT_FROM"],
-  AWS_REGION: ["APP_AWS_REGION", "AWS_REGION"],
-  AWS_ACCESS_KEY_ID: ["APP_AWS_ACCESS", "AWS_ACCESS_KEY_ID"],
-  AWS_SECRET_ACCESS_KEY: ["APP_AWS_SECRET", "AWS_SECRET_ACCESS_KEY"],
   DEFAULT_SMTP_HOST: ["APP_SMTP_HOST", "DEFAULT_SMTP_HOST"],
   DEFAULT_SMTP_PORT: ["APP_SMTP_PORT", "DEFAULT_SMTP_PORT"],
   DATA_OBFUSCATION_KEY: ["APP_DATA_MASK", "DATA_OBFUSCATION_KEY"],
-  ZEPTO_API_KEY: ["APP_ZEPTO_KEY", "ZEPTO_API_KEY"],
-  ZEPTO_FROM_ADDRESS: ["APP_ZEPTO_FROM", "ZEPTO_FROM_ADDRESS"],
-  ZEPTO_BASE_URL: ["APP_ZEPTO_URL", "ZEPTO_BASE_URL"],
-  ZEPTO_BOUNCE_ADDRESS: ["APP_ZEPTO_BOUNCE", "ZEPTO_BOUNCE_ADDRESS"],
-  ZEPTO_REPLY_TO: ["APP_ZEPTO_REPLY", "ZEPTO_REPLY_TO"],
-  ZEPTO_QUOTA_PER_MINUTE: ["APP_ZEPTO_QPM", "ZEPTO_QUOTA_PER_MINUTE"],
-  ZEPTO_QUOTA_PER_DAY: ["APP_ZEPTO_QPD", "ZEPTO_QUOTA_PER_DAY"],
+  RESEND_API_KEY: ["APP_RESEND_KEY", "RESEND_API_KEY"],
+  RESEND_FROM_ADDRESS: ["APP_RESEND_FROM", "RESEND_FROM_ADDRESS"],
 };
 
 function decodeSecretValue(raw) {
@@ -104,40 +83,17 @@ const SMTP_ROTATE_AFTER_DEFAULT = 200;
 const SMTP_CONNECTION_TIMEOUT_MS = parseInt(envValue("SMTP_CONNECTION_TIMEOUT_MS", "15000"), 10);
 const SMTP_SOCKET_TIMEOUT_MS = parseInt(envValue("SMTP_SOCKET_TIMEOUT_MS", "20000"), 10);
 const DATA_SYNC_DEFAULT_MESSAGE = "chore: sync data folder";
-const MAIL_TRANSPORT = (envValue("MAIL_TRANSPORT", "smtp") || "smtp").toLowerCase();
-const ZOHO_DOMAIN = envValue("ZOHO_DOMAIN", "zoho.com");
-const ZOHO_CLIENT_ID = envValue("ZOHO_CLIENT_ID", "", { secret: true }) || "";
-const ZOHO_CLIENT_SECRET = envValue("ZOHO_CLIENT_SECRET", "", { secret: true }) || "";
-const ZOHO_REFRESH_TOKEN = envValue("ZOHO_REFRESH_TOKEN", "", { secret: true }) || "";
+const MAIL_TRANSPORT = (envValue("MAIL_TRANSPORT", "resend") || "resend").toLowerCase();
 const DEFAULT_FROM_ADDRESS = envValue("DEFAULT_FROM", undefined, { secret: true });
-const SES_FROM_ADDRESS = envValue("SES_FROM", DEFAULT_FROM_ADDRESS, { secret: true });
-const ZOHO_FROM_ADDRESS = envValue("ZOHO_FROM_ADDRESS", SES_FROM_ADDRESS, { secret: true });
-const ZOHO_ACCOUNT_ID = envValue("ZOHO_ACCOUNT_ID", "", { secret: true }) || "";
-const ZOHO_ACCOUNTS_HOST = envValue("ZOHO_ACCOUNTS_HOST", `accounts.${ZOHO_DOMAIN}`);
-const ZOHO_MAIL_HOST = envValue("ZOHO_MAIL_HOST", `mail.${ZOHO_DOMAIN}`);
-const AWS_REGION = envValue("AWS_REGION", "us-east-1");
-const AWS_ACCESS_KEY_ID = envValue("AWS_ACCESS_KEY_ID", "", { secret: true });
-const AWS_SECRET_ACCESS_KEY = envValue("AWS_SECRET_ACCESS_KEY", "", { secret: true });
-const DEFAULT_SMTP_HOST = envValue("DEFAULT_SMTP_HOST", "email-smtp.us-east-1.amazonaws.com");
+const RESEND_API_KEY = envValue("RESEND_API_KEY", "", { secret: true }) || "";
+const RESEND_FROM_ADDRESS = envValue("RESEND_FROM_ADDRESS", DEFAULT_FROM_ADDRESS, { secret: true });
+const DEFAULT_SMTP_HOST = envValue("DEFAULT_SMTP_HOST", "smtp.example.com");
 const DEFAULT_SMTP_PORT = parseInt(envValue("DEFAULT_SMTP_PORT", "587"), 10);
 const DATA_OBFUSCATION_KEY = envValue("DATA_OBFUSCATION_KEY", "nodeemail", { secret: true }) || "nodeemail";
 const SESSION_TIMEOUT_SECONDS = parseInt(envValue("SESSION_TIMEOUT", "3600"), 10);
-const ZEPTO_API_KEY = envValue("ZEPTO_API_KEY", "", { secret: true }) || "";
-const ZEPTO_BASE_URL = envValue("ZEPTO_BASE_URL", "https://api.zeptomail.com/v1.1/as/email");
-const ZEPTO_FROM_ADDRESS = envValue("ZEPTO_FROM_ADDRESS", SES_FROM_ADDRESS || DEFAULT_FROM_ADDRESS, {
-  secret: true,
-});
-const ZEPTO_BOUNCE_ADDRESS = envValue("ZEPTO_BOUNCE_ADDRESS", "", { secret: true });
-const ZEPTO_REPLY_TO = envValue("ZEPTO_REPLY_TO", "", { secret: true });
-const ZEPTO_QUOTA_PER_MINUTE = parseInt(envValue("ZEPTO_QUOTA_PER_MINUTE", "60"), 10);
-const ZEPTO_QUOTA_PER_DAY = parseInt(envValue("ZEPTO_QUOTA_PER_DAY", "1000"), 10);
-
-if (AWS_ACCESS_KEY_ID) process.env.AWS_ACCESS_KEY_ID = AWS_ACCESS_KEY_ID;
-if (AWS_SECRET_ACCESS_KEY) process.env.AWS_SECRET_ACCESS_KEY = AWS_SECRET_ACCESS_KEY;
 
 const sessions = new Map();
 const apiRate = new Map();
-const zohoTokenCache = new Map();
 
 ensureDataFiles();
 
@@ -207,7 +163,7 @@ async function ensureDataFiles() {
   if (!(await fs.pathExists(mailProvidersFilePath))) {
     await writeJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
   }
-  await ensureDefaultZeptoProvider();
+  await ensureDefaultResendProvider();
 }
 
 const DATA_KEY_BUFFER = Buffer.from(DATA_OBFUSCATION_KEY || "nodeemail");
@@ -455,7 +411,7 @@ function normalizeMailProvider(provider = {}) {
   return {
     id: provider.id || uuid(),
     name: provider.name || "Provider",
-    type: (provider.type || "smtp").toLowerCase(),
+    type: (provider.type || "resend").toLowerCase(),
     enabled: provider.enabled !== false,
     quotaPerMinute: Number(provider.quotaPerMinute) || 60,
     quotaPerDay: Number(provider.quotaPerDay) || 1000,
@@ -483,29 +439,24 @@ async function saveMailProviderPool(pool) {
   await writeJson(mailProvidersFilePath, pool);
 }
 
-async function ensureDefaultZeptoProvider() {
-  if (!ZEPTO_API_KEY || !ZEPTO_FROM_ADDRESS) return;
+async function ensureDefaultResendProvider() {
+  if (!RESEND_API_KEY || !RESEND_FROM_ADDRESS) return;
   const pool = await loadMailProviderPool();
   const alreadyExists = pool.providers.some(
     (provider) =>
-      provider.type === "zepto" &&
+      provider.type === "resend" &&
       provider.config &&
-      (provider.config.apiKey === ZEPTO_API_KEY ||
-        provider.config.fromAddress?.toLowerCase() === ZEPTO_FROM_ADDRESS.toLowerCase())
+      (provider.config.apiKey === RESEND_API_KEY ||
+        provider.config.fromAddress?.toLowerCase() === RESEND_FROM_ADDRESS.toLowerCase())
   );
   if (alreadyExists) return;
   const provider = normalizeMailProvider({
-    name: "ZeptoMail API",
-    type: "zepto",
+    name: "Resend API",
+    type: "resend",
     enabled: true,
-    quotaPerMinute: ZEPTO_QUOTA_PER_MINUTE,
-    quotaPerDay: ZEPTO_QUOTA_PER_DAY,
     config: {
-      apiKey: ZEPTO_API_KEY,
-      baseUrl: ZEPTO_BASE_URL,
-      fromAddress: ZEPTO_FROM_ADDRESS,
-      replyTo: ZEPTO_REPLY_TO || undefined,
-      bounceAddress: ZEPTO_BOUNCE_ADDRESS || undefined,
+      apiKey: RESEND_API_KEY,
+      fromAddress: RESEND_FROM_ADDRESS,
     },
   });
   pool.providers.push(provider);
@@ -544,6 +495,11 @@ function providerCanSend(provider, batchSize, now = Date.now()) {
   return true;
 }
 
+function isSupportedProviderType(type) {
+  const normalized = String(type || "").toLowerCase();
+  return normalized === "resend" || normalized === "smtp";
+}
+
 async function incrementProviderUsage(providerId, increment) {
   if (!providerId || !increment) return;
   const pool = await loadMailProviderPool();
@@ -569,7 +525,14 @@ async function selectMailProvider(batchSize, excludeIds = []) {
   for (let i = 0; i < providers.length; i += 1) {
     const idx = (start + i) % providers.length;
     const provider = providers[idx];
-    if (!provider || !provider.enabled || excludeIds.includes(provider.id)) continue;
+    if (
+      !provider ||
+      !provider.enabled ||
+      excludeIds.includes(provider.id) ||
+      !isSupportedProviderType(provider.type)
+    ) {
+      continue;
+    }
     if (ensureProviderUsage(provider, now)) mutated = true;
     if (!providerCanSend(provider, batchSize, now)) continue;
     pool.rotationIndex = (idx + 1) % providers.length;
@@ -586,17 +549,10 @@ async function selectMailProvider(batchSize, excludeIds = []) {
 }
 
 async function dispatchWithProvider(provider, job, batch) {
-  const type = provider.type || "smtp";
+  const type = provider.type || "resend";
   const config = provider.config || {};
-  if (type === "zoho") {
-    return sendBatchWithZoho(job, batch, config);
-  }
-  if (type === "zepto") {
-    return sendBatchWithZepto(job, batch, config);
-  }
-  if (type === "ses") {
-    const proxy = config.proxy || null;
-    return sendBatchWithSes(job, batch, proxy, config);
+  if (type === "resend") {
+    return sendBatchWithResend(job, batch, config);
   }
   if (type === "smtp") {
     const smtpConfig = {
@@ -638,26 +594,14 @@ async function sendBatchUsingProviders(job, batch) {
 
 async function hasEnabledMailProviders() {
   const pool = await loadMailProviderPool();
-  return pool.providers.some((p) => p.enabled);
+  return pool.providers.some((p) => p.enabled && isSupportedProviderType(p.type));
 }
 
 function validateProviderConfig(type, config = {}) {
-  if (type === "zoho") {
-    const required = ["accountId", "clientId", "clientSecret", "refreshToken", "fromAddress"];
-    const missing = required.filter((key) => !config[key]);
-    if (missing.length) return `Zoho provider missing: ${missing.join(", ")}`;
-    return null;
-  }
-  if (type === "zepto") {
+  if (type === "resend") {
     const required = ["apiKey", "fromAddress"];
     const missing = required.filter((key) => !config[key]);
-    if (missing.length) return `ZeptoMail provider missing: ${missing.join(", ")}`;
-    return null;
-  }
-  if (type === "ses") {
-    const required = ["region", "accessKeyId", "secretAccessKey", "fromAddress"];
-    const missing = required.filter((key) => !config[key]);
-    if (missing.length) return `SES provider missing: ${missing.join(", ")}`;
+    if (missing.length) return `Resend provider missing: ${missing.join(", ")}`;
     return null;
   }
   if (type === "smtp") {
@@ -672,7 +616,7 @@ function validateProviderConfig(type, config = {}) {
 function sanitizeProviderPayload(payload = {}, existing = {}) {
   const provider = { ...existing };
   if (payload.name !== undefined) provider.name = String(payload.name || "").trim();
-  if (payload.type !== undefined) provider.type = String(payload.type || "smtp").toLowerCase();
+  if (payload.type !== undefined) provider.type = String(payload.type || "resend").toLowerCase();
   if (payload.enabled !== undefined) provider.enabled = Boolean(payload.enabled);
   if (payload.quotaPerMinute !== undefined) {
     provider.quotaPerMinute = Math.max(0, parseInt(payload.quotaPerMinute, 10) || 0);
@@ -686,40 +630,6 @@ function sanitizeProviderPayload(payload = {}, existing = {}) {
   }
   provider.updatedAt = new Date().toISOString();
   return normalizeMailProvider(provider);
-}
-
-async function getZohoAccessToken(config = {}) {
-  const clientId = config.clientId || ZOHO_CLIENT_ID;
-  const clientSecret = config.clientSecret || ZOHO_CLIENT_SECRET;
-  const refreshToken = config.refreshToken || ZOHO_REFRESH_TOKEN;
-  const accountsHost = config.accountsHost || config.accounts_host || ZOHO_ACCOUNTS_HOST;
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Zoho Mail API credentials are not configured");
-  }
-  const cacheKey = `${clientId}:${refreshToken}:${accountsHost}`;
-  const cached = zohoTokenCache.get(cacheKey);
-  if (cached && Date.now() < cached.expiresAt - 60_000) {
-    return cached.token;
-  }
-  const params = new URLSearchParams({
-    refresh_token: refreshToken,
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "refresh_token",
-  });
-  const response = await fetch(`https://${accountsHost}/oauth/v2/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    const errMsg = data.error || data.error_description || response.statusText;
-    throw new Error(`Zoho token error: ${errMsg}`);
-  }
-  const expiresIn = Number(data.expires_in) || 3600;
-  zohoTokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + expiresIn * 1000 });
-  return data.access_token;
 }
 
 function normalizeJobAttachments(job) {
@@ -816,134 +726,35 @@ async function replayExistingJob(job, payload, options = {}) {
   return dispatchJob(job, payload, replayOptions);
 }
 
-function buildZohoForm(job, recipients, config = {}) {
-  const accountId = config.accountId || ZOHO_ACCOUNT_ID;
-  if (!accountId) {
-    throw new Error("ZOHO_ACCOUNT_ID is not configured");
-  }
-  const fromAddress = job.from || config.fromAddress || ZOHO_FROM_ADDRESS;
-  if (!fromAddress) {
-    throw new Error("No from address configured for Zoho transport");
-  }
-  const content = job.htmlBody || job.textBody || "";
-  const form = new FormData();
-  form.append("fromAddress", fromAddress);
-  form.append("toAddress", recipients.join(","));
-  if (job.replyTo) form.append("replyToAddress", job.replyTo);
-  form.append("subject", job.subject || "");
-  form.append("content", content);
-  form.append("mailFormat", job.htmlBody ? "html" : "text");
-  const attachments = normalizeJobAttachments(job);
-  attachments.forEach((att) => {
-    form.append("attachments", att.buffer, {
-      filename: att.filename,
-      contentType: att.contentType,
-    });
-  });
-  return form;
-}
-
-async function submitZohoForm(form, config = {}) {
-  const token = await getZohoAccessToken(config);
-  const headers = {
-    Authorization: `Zoho-oauthtoken ${token}`,
-    Accept: "application/json",
-    ...form.getHeaders(),
-  };
-  const mailHost = config.mailHost || config.mail_host || ZOHO_MAIL_HOST;
-  const accountId = config.accountId || ZOHO_ACCOUNT_ID;
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        method: "POST",
-        host: mailHost,
-        path: `/api/accounts/${accountId}/messages`,
-        headers,
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => {
-          data += chunk;
-        });
-        res.on("end", () => {
-          let parsed = {};
-          try {
-            parsed = data ? JSON.parse(data) : {};
-          } catch (err) {
-            parsed = { message: data };
-          }
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(parsed);
-          } else {
-            reject(
-              new Error(
-                `Zoho API ${res.statusCode}: ${parsed.message || parsed.data || data || res.statusMessage}`
-              )
-            );
-          }
-        });
-      }
-    );
-    req.on("error", reject);
-    form.pipe(req);
-  });
-}
-
-async function sendBatchWithZoho(job, batch, config = {}) {
-  try {
-    const form = buildZohoForm(job, batch, config);
-    await submitZohoForm(form, config);
-    return {
-      success: true,
-      sent: batch.length,
-      failed: 0,
-      recipients: batch,
-      transport: "zoho",
-      errorDetails: [],
-    };
-  } catch (err) {
-    console.error("Zoho send failure:", err.message);
-    return {
-      success: false,
-      sent: 0,
-      failed: batch.length,
-      recipients: batch,
-      transport: "zoho",
-      error: err.message,
-      errorDetails: [{ message: err.message }],
-    };
-  }
-}
-
-async function sendBatchWithZepto(job, batch, config = {}) {
-  const apiKey = config.apiKey || config.token || ZEPTO_API_KEY;
+async function sendBatchWithResend(job, batch, config = {}) {
+  const apiKey = config.apiKey || config.token || RESEND_API_KEY;
   if (!apiKey) {
     return {
       success: false,
       sent: 0,
       failed: batch.length,
       recipients: batch,
-      transport: "zepto",
-      error: "ZeptoMail API key is not configured",
-      errorDetails: [{ message: "ZeptoMail API key is not configured" }],
+      transport: "resend",
+      error: "Resend API key is not configured",
+      errorDetails: [{ message: "Resend API key is not configured" }],
     };
   }
-  const fromAddress = config.fromAddress || job.from || ZEPTO_FROM_ADDRESS;
+  const fromAddress = config.fromAddress || job.from || RESEND_FROM_ADDRESS || DEFAULT_FROM_ADDRESS;
   if (!fromAddress) {
     return {
       success: false,
       sent: 0,
       failed: batch.length,
       recipients: batch,
-      transport: "zepto",
-      error: "No from address configured for ZeptoMail provider",
-      errorDetails: [{ message: "No from address configured for ZeptoMail provider" }],
+      transport: "resend",
+      error: "No from address configured for Resend provider",
+      errorDetails: [{ message: "No from address configured for Resend provider" }],
     };
   }
-  const endpoint = config.baseUrl || ZEPTO_BASE_URL;
-  const replyToAddress = job.replyTo || config.replyTo || ZEPTO_REPLY_TO;
-  const bounceAddress = config.bounceAddress || ZEPTO_BOUNCE_ADDRESS || undefined;
-  const fromName = job.fromName || job.from || "Mailer";
+
+  const resend = new Resend(apiKey);
+  const fromName = config.fromName || job.fromName || job.from || "Mailer";
+  const from = formatFromAddress(fromName, fromAddress);
   const originalHtml = job.htmlBody || "";
   const htmlBody = (() => {
     const normalized = originalHtml.replace(/\r\n/g, "\n");
@@ -955,44 +766,14 @@ async function sendBatchWithZepto(job, batch, config = {}) {
   const textBodyRaw =
     job.textBody && job.textBody.trim().length
       ? job.textBody
-      : job.htmlBody
-        ? stripHtml(job.htmlBody)
+      : htmlBody
+        ? stripHtml(htmlBody)
         : "";
   const textBody = textBodyRaw.replace(/\r\n/g, "\n");
-  const payloads = batch.map((address) => {
-    const entry = {
-      from: {
-        address: fromAddress,
-        name: fromName,
-      },
-      to: [
-        {
-          email_address: {
-            address,
-            name: address,
-          },
-        },
-      ],
-      subject: job.subject || "",
-      htmlbody: htmlBody || undefined,
-      textbody: textBody || undefined,
-    };
-    if (replyToAddress) {
-      entry.reply_to = [
-        {
-          address: replyToAddress,
-          name: fromName,
-        },
-      ];
-    }
-    if (bounceAddress) {
-      entry.bounce_address = bounceAddress;
-    }
-    return entry;
-  });
-  const authHeader = /^zoho-enczapikey/i.test(apiKey.trim())
-    ? apiKey.trim()
-    : `Zoho-enczapikey ${apiKey.trim()}`;
+  const attachments = normalizeJobAttachments(job).map((att) => ({
+    filename: att.filename,
+    content: att.buffer.toString("base64"),
+  }));
 
   const results = {
     sent: 0,
@@ -1000,40 +781,24 @@ async function sendBatchWithZepto(job, batch, config = {}) {
     errorDetails: [],
   };
 
-  for (const entry of payloads) {
+  for (const address of batch) {
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: authHeader,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(entry),
+      const response = await resend.emails.send({
+        from,
+        to: [address],
+        subject: job.subject || "",
+        html: htmlBody || undefined,
+        text: textBody || undefined,
+        replyTo: job.replyTo || config.replyTo || undefined,
+        attachments: attachments.length ? attachments : undefined,
       });
-      const rawBody = await response.text();
-      let data = null;
-      if (rawBody) {
-        try {
-          data = JSON.parse(rawBody);
-        } catch (err) {
-          data = rawBody;
-        }
-      }
-      if (!response.ok) {
-        const payloadMessage =
-          data && typeof data === "object" && !Array.isArray(data)
-            ? data.message || data.error || null
-            : null;
-        const message =
-          payloadMessage ||
-          (data && typeof data === "object" ? JSON.stringify(data) : rawBody || response.statusText);
+      if (response?.error) {
+        const message = response.error.message || "Resend API request failed";
         results.failed += 1;
         results.errorDetails.push({
+          recipient: address,
           message,
-          response: data,
-          raw: rawBody,
-          recipient: entry.to?.[0]?.email_address?.address,
+          response: response.error,
         });
       } else {
         results.sent += 1;
@@ -1041,8 +806,8 @@ async function sendBatchWithZepto(job, batch, config = {}) {
     } catch (err) {
       results.failed += 1;
       results.errorDetails.push({
+        recipient: address,
         message: err.message,
-        recipient: entry.to?.[0]?.email_address?.address,
       });
     }
   }
@@ -1052,7 +817,7 @@ async function sendBatchWithZepto(job, batch, config = {}) {
     sent: results.sent,
     failed: results.failed,
     recipients: batch,
-    transport: "zepto",
+    transport: "resend",
     error: results.failed ? results.errorDetails[0]?.message : undefined,
     errorDetails: results.errorDetails,
   };
@@ -1768,7 +1533,7 @@ app.post("/api/jobs/:id/replay", requireAuth, async (req, res) => {
 
 app.post("/admin/jobs/replay", requireAuth, requireAdmin, async (req, res) => {
   const {
-    transport = "zoho",
+    transport = "resend",
     statuses,
     limit,
     dryRun = false,
@@ -1783,7 +1548,7 @@ app.post("/admin/jobs/replay", requireAuth, requireAdmin, async (req, res) => {
     normalizedStatuses.includes(String(job.status || "").toLowerCase())
   );
   const includeUnknownTransports =
-    includeUnknown !== undefined ? Boolean(includeUnknown) : transport === "zoho";
+    includeUnknown !== undefined ? Boolean(includeUnknown) : transport === "resend";
   if (transport) {
     candidates = candidates.filter((job) => {
       const storedTransport = storedJobTransport(job);
@@ -2006,21 +1771,9 @@ async function sendEmailJob(job) {
           continue;
         }
       }
-      const proxy = await getNextProxy();
-      const useSes = MAIL_TRANSPORT === "ses" && !(await hasConfiguredSmtpPool());
-      let smtpServer;
-      if (MAIL_TRANSPORT === "zoho") {
-        const zohoResult = await sendBatchWithZoho(job, batch);
-        results.push(zohoResult);
-        sentTotal += zohoResult.sent;
-        failedTotal += zohoResult.failed;
-      } else if (useSes) {
-        const sesResult = await sendBatchWithSes(job, batch, proxy);
-        results.push({ ...sesResult, proxy, transport: "ses" });
-        sentTotal += sesResult.sent;
-        failedTotal += sesResult.failed;
-      } else {
-        smtpServer = await resolveSmtpServerForBatch(job);
+      if (MAIL_TRANSPORT === "smtp") {
+        const proxy = await getNextProxy();
+        const smtpServer = await resolveSmtpServerForBatch(job);
         const smtpResult = await sendBatchWithSmtp(job, batch, smtpServer, proxy);
         if (smtpServer?.__fromPool) {
           await recordSmtpUsage(smtpResult.sent || batch.length);
@@ -2028,6 +1781,11 @@ async function sendEmailJob(job) {
         results.push({ ...smtpResult, proxy });
         sentTotal += smtpResult.sent;
         failedTotal += smtpResult.failed;
+      } else {
+        const resendResult = await sendBatchWithResend(job, batch);
+        results.push(resendResult);
+        sentTotal += resendResult.sent;
+        failedTotal += resendResult.failed;
       }
       if (job.delayBetweenBatches) {
         await new Promise((resolve) => setTimeout(resolve, job.delayBetweenBatches * 1000));
@@ -2044,69 +1802,6 @@ async function sendEmailJob(job) {
     failed: failedTotal,
     results,
   };
-}
-
-async function sendBatchWithSes(job, batch, proxyUrl, sesOptions = {}) {
-  const region = sesOptions.region || AWS_REGION || "us-east-1";
-  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
-  const credentials =
-    sesOptions.accessKeyId && sesOptions.secretAccessKey
-      ? {
-          accessKeyId: sesOptions.accessKeyId,
-          secretAccessKey: sesOptions.secretAccessKey,
-        }
-      : undefined;
-  const ses = new SESClient({
-    region,
-    credentials,
-    requestHandler: new NodeHttpHandler(agent ? { httpsAgent: agent } : {}),
-  });
-  const sourceEmail = sesOptions.fromAddress || SES_FROM_ADDRESS || DEFAULT_FROM_ADDRESS || job.from;
-  if (!sourceEmail) {
-    throw new Error("No FROM email configured. Set SES_FROM or DEFAULT_FROM.");
-  }
-  const source = formatFromAddress(job.fromName || job.from, sourceEmail);
-  const attachments = normalizeJobAttachments(job).map((att) => ({
-    filename: att.filename,
-    content: att.buffer,
-    contentType: att.contentType,
-  }));
-  const transporter = nodemailer.createTransport({
-    SES: { ses, aws: { SendRawEmailCommand } },
-  });
-  let sent = 0;
-  let failed = 0;
-  const errors = [];
-  const errorDetails = [];
-  for (const recipient of batch) {
-    try {
-      await transporter.sendMail({
-        from: source,
-        to: recipient,
-        envelope: {
-          from: sourceEmail,
-          to: recipient,
-        },
-        subject: job.subject,
-        text: job.textBody || (job.htmlBody ? stripHtml(job.htmlBody) : ""),
-        html: job.htmlBody,
-        replyTo: job.replyTo,
-        attachments,
-      });
-      sent += 1;
-    } catch (err) {
-      failed += 1;
-      errors.push(err.message);
-      errorDetails.push({
-        recipient,
-        message: err.message,
-        code: err?.responseCode || err.code,
-        response: err?.response || err.message,
-      });
-      console.error(`SES send failure (${recipient}):`, err.message);
-    }
-  }
-  return { success: failed === 0, sent, failed, recipients: batch, error: errors[0], errorDetails };
 }
 
 function stripHtml(html) {
@@ -2200,11 +1895,6 @@ async function resolveSmtpServerForBatch(job) {
     }
     throw err;
   }
-}
-
-async function hasConfiguredSmtpPool() {
-  const pool = await loadSmtpPool();
-  return (pool.servers || []).length > 0;
 }
 
 async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
