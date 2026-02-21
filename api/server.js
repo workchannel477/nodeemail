@@ -11,7 +11,11 @@ import { createHash } from "crypto";
 import { execSync } from "child_process";
 import dotenv from "dotenv";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.join(__dirname, "..");
+
+dotenv.config({ path: path.join(rootDir, ".env") });
 
 const ENV_ALIASES = {
   PORT: ["APP_PORT", "PORT"],
@@ -27,8 +31,6 @@ const ENV_ALIASES = {
   DEFAULT_SMTP_HOST: ["APP_SMTP_HOST", "DEFAULT_SMTP_HOST"],
   DEFAULT_SMTP_PORT: ["APP_SMTP_PORT", "DEFAULT_SMTP_PORT"],
   DATA_OBFUSCATION_KEY: ["APP_DATA_MASK", "DATA_OBFUSCATION_KEY"],
-  RESEND_API_KEY: ["APP_RESEND_KEY", "RESEND_API_KEY"],
-  RESEND_FROM_ADDRESS: ["APP_RESEND_FROM", "RESEND_FROM_ADDRESS"],
 };
 
 function decodeSecretValue(raw) {
@@ -56,9 +58,6 @@ function envValue(name, fallback, { secret = false } = {}) {
   return fallback;
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.join(__dirname, "..");
 const dataDir = path.join(rootDir, "data");
 const logDir = path.join(rootDir, "logs");
 const staticDir = path.join(rootDir, "public");
@@ -85,8 +84,6 @@ const SMTP_SOCKET_TIMEOUT_MS = parseInt(envValue("SMTP_SOCKET_TIMEOUT_MS", "2000
 const DATA_SYNC_DEFAULT_MESSAGE = "chore: sync data folder";
 const MAIL_TRANSPORT = (envValue("MAIL_TRANSPORT", "resend") || "resend").toLowerCase();
 const DEFAULT_FROM_ADDRESS = envValue("DEFAULT_FROM", undefined, { secret: true });
-const RESEND_API_KEY = envValue("RESEND_API_KEY", "", { secret: true }) || "";
-const RESEND_FROM_ADDRESS = envValue("RESEND_FROM_ADDRESS", DEFAULT_FROM_ADDRESS, { secret: true });
 const DEFAULT_SMTP_HOST = envValue("DEFAULT_SMTP_HOST", "smtp.example.com");
 const DEFAULT_SMTP_PORT = parseInt(envValue("DEFAULT_SMTP_PORT", "587"), 10);
 const DATA_OBFUSCATION_KEY = envValue("DATA_OBFUSCATION_KEY", "nodeemail", { secret: true }) || "nodeemail";
@@ -163,7 +160,6 @@ async function ensureDataFiles() {
   if (!(await fs.pathExists(mailProvidersFilePath))) {
     await writeJson(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
   }
-  await ensureDefaultResendProvider();
 }
 
 const DATA_KEY_BUFFER = Buffer.from(DATA_OBFUSCATION_KEY || "nodeemail");
@@ -439,30 +435,6 @@ async function saveMailProviderPool(pool) {
   await writeJson(mailProvidersFilePath, pool);
 }
 
-async function ensureDefaultResendProvider() {
-  if (!RESEND_API_KEY || !RESEND_FROM_ADDRESS) return;
-  const pool = await loadMailProviderPool();
-  const alreadyExists = pool.providers.some(
-    (provider) =>
-      provider.type === "resend" &&
-      provider.config &&
-      (provider.config.apiKey === RESEND_API_KEY ||
-        provider.config.fromAddress?.toLowerCase() === RESEND_FROM_ADDRESS.toLowerCase())
-  );
-  if (alreadyExists) return;
-  const provider = normalizeMailProvider({
-    name: "Resend API",
-    type: "resend",
-    enabled: true,
-    config: {
-      apiKey: RESEND_API_KEY,
-      fromAddress: RESEND_FROM_ADDRESS,
-    },
-  });
-  pool.providers.push(provider);
-  await saveMailProviderPool(pool);
-}
-
 function ensureProviderUsage(provider, now = Date.now()) {
   let mutated = false;
   provider.usage = normalizeProviderUsage(provider.usage);
@@ -727,7 +699,7 @@ async function replayExistingJob(job, payload, options = {}) {
 }
 
 async function sendBatchWithResend(job, batch, config = {}) {
-  const apiKey = config.apiKey || config.token || RESEND_API_KEY;
+  const apiKey = config.apiKey || config.token;
   if (!apiKey) {
     return {
       success: false,
@@ -739,7 +711,7 @@ async function sendBatchWithResend(job, batch, config = {}) {
       errorDetails: [{ message: "Resend API key is not configured" }],
     };
   }
-  const fromAddress = config.fromAddress || job.from || RESEND_FROM_ADDRESS || DEFAULT_FROM_ADDRESS;
+  const fromAddress = config.fromAddress || job.from || DEFAULT_FROM_ADDRESS;
   if (!fromAddress) {
     return {
       success: false,
@@ -1770,8 +1742,12 @@ async function sendEmailJob(job) {
           failedTotal += providerResult.failed;
           continue;
         }
+        throw new Error(
+          "No eligible enabled provider is currently available. Check provider quotas, enabled state, and credentials."
+        );
       }
-      if (MAIL_TRANSPORT === "smtp") {
+      const smtpPoolAvailable = await hasConfiguredSmtpPool();
+      if (MAIL_TRANSPORT === "smtp" || smtpPoolAvailable) {
         const proxy = await getNextProxy();
         const smtpServer = await resolveSmtpServerForBatch(job);
         const smtpResult = await sendBatchWithSmtp(job, batch, smtpServer, proxy);
@@ -1782,10 +1758,9 @@ async function sendEmailJob(job) {
         sentTotal += smtpResult.sent;
         failedTotal += smtpResult.failed;
       } else {
-        const resendResult = await sendBatchWithResend(job, batch);
-        results.push(resendResult);
-        sentTotal += resendResult.sent;
-        failedTotal += resendResult.failed;
+        throw new Error(
+          "No enabled mail providers configured. Add a Resend (or SMTP) provider in Admin > API & SMTP Providers."
+        );
       }
       if (job.delayBetweenBatches) {
         await new Promise((resolve) => setTimeout(resolve, job.delayBetweenBatches * 1000));
@@ -1895,6 +1870,11 @@ async function resolveSmtpServerForBatch(job) {
     }
     throw err;
   }
+}
+
+async function hasConfiguredSmtpPool() {
+  const pool = await loadSmtpPool();
+  return (pool.servers || []).length > 0;
 }
 
 async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
