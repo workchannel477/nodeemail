@@ -1,6 +1,19 @@
 const apiUrl = (path) => (window.API ? window.API.url(path) : path);
 const apiFetch = (path, options) => fetch(apiUrl(path), options);
 const valueOr = (value, fallback) => (value === undefined || value === null ? fallback : value);
+const readApiMessage = async (response, fallback = 'Request failed') => {
+  try {
+    const data = await response.json();
+    return data && data.message ? data.message : fallback;
+  } catch (error) {
+    try {
+      const text = await response.text();
+      return text || fallback;
+    } catch (innerError) {
+      return fallback;
+    }
+  }
+};
 
 // Admin App (admin.html)
 const adminAppDefinition = () => ({
@@ -36,7 +49,7 @@ const adminAppDefinition = () => ({
     message: '',
     isReady: false,
     showAddUserModal: false,
-    showChangePasswordModal: false,
+    isChangePasswordModalOpen: false,
     showEditUserModal: false,
     activeTab: 'all',
     dataSync: { message: '', push: true, busy: false, status: '', error: '', logs: [] },
@@ -492,13 +505,9 @@ const adminAppDefinition = () => ({
           body: JSON.stringify(this.newUser)
         });
         
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to create user');
-        }
-        
-        const data = await response.json();
-        this.message = data.message;
+        if (!response.ok) throw new Error(await readApiMessage(response, 'Failed to create user'));
+        const data = await response.json().catch(() => ({}));
+        this.message = data.message || 'User created successfully';
         this.showAddUserModal = false;
         this.newUser = { username: '', password: '', role: 'user', status: 'active' };
         
@@ -547,10 +556,10 @@ const adminAppDefinition = () => ({
       }
     },
     
-    showChangePasswordModal(user) {
+    openChangePasswordModal(user) {
       this.selectedUser = user;
       this.passwordForm.newPassword = '';
-      this.showChangePasswordModal = true;
+      this.isChangePasswordModalOpen = true;
     },
     
     async changeUserPassword() {
@@ -575,7 +584,7 @@ const adminAppDefinition = () => ({
         
         const data = await response.json();
         this.message = data.message;
-        this.showChangePasswordModal = false;
+        this.isChangePasswordModalOpen = false;
         this.passwordForm.newPassword = '';
       } catch (error) {
         this.error = error.message;

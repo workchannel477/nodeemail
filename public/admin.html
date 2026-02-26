@@ -200,7 +200,7 @@
                                   class="text-indigo-600 hover:text-indigo-900">
                             <i class="ti ti-edit"></i>
                           </button>
-                          <button @click="showChangePasswordModal(user)"
+                          <button @click="openChangePasswordModal(user)"
                                   class="text-blue-600 hover:text-blue-900">
                             <i class="ti ti-key"></i>
                           </button>
@@ -801,11 +801,11 @@ http://host:port"></textarea>
       </div>
 
       <!-- Change Password Modal -->
-      <div x-show="showChangePasswordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="isChangePasswordModalOpen" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Change Password</h3>
-            <button @click="showChangePasswordModal = false" class="text-gray-400 hover:text-gray-600">
+            <button @click="isChangePasswordModalOpen = false" class="text-gray-400 hover:text-gray-600">
               <i class="ti ti-x text-xl"></i>
             </button>
           </div>
@@ -822,7 +822,7 @@ http://host:port"></textarea>
               <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">
                 Update Password
               </button>
-              <button type="button" @click="showChangePasswordModal = false" 
+              <button type="button" @click="isChangePasswordModalOpen = false" 
                       class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                 Cancel
               </button>

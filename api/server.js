@@ -233,6 +233,42 @@ function cryptoSalt() {
   return uuid().replace(/-/g, "");
 }
 
+function normalizeUserRole(role = "user") {
+  return String(role || "user").toLowerCase() === "admin" ? "admin" : "user";
+}
+
+function normalizeUserStatus(status = "active") {
+  return String(status || "active").toLowerCase() === "suspended" ? "suspended" : "active";
+}
+
+function sanitizeUserForResponse(user = {}) {
+  return {
+    id: user.id,
+    username: user.username,
+    role: normalizeUserRole(user.role),
+    status: normalizeUserStatus(user.status),
+    mailboxes: Array.isArray(user.mailboxes) ? user.mailboxes : [],
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
+async function loadAuthStore() {
+  const payload = await readJson(authFilePath, { users: [] });
+  if (!Array.isArray(payload.users)) {
+    if (payload && payload.__obf && payload.__data) {
+      throw new Error("Unable to decode auth store. Verify DATA_OBFUSCATION_KEY / APP_DATA_MASK.");
+    }
+    payload.users = [];
+  }
+  return payload;
+}
+
+async function saveAuthStore(payload) {
+  payload.users = Array.isArray(payload.users) ? payload.users : [];
+  await writeJson(authFilePath, payload);
+}
+
 function recipientsFile(jobId) {
   return path.join(recipientsDir, `${jobId}.json`);
 }
@@ -1046,7 +1082,7 @@ app.post("/auth/login", async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ message: "Username and password are required" });
   }
-  const data = await readJson(authFilePath, { users: [] });
+  const data = await loadAuthStore();
   const user = (data.users || []).find((u) => u.username === username);
   if (!user) return res.status(401).json({ message: "Invalid credentials" });
   const expected = hashPassword(password, user.salt);
@@ -1078,7 +1114,7 @@ app.post("/auth/logout", requireAuth, (req, res) => {
 });
 
 app.get("/auth/me", requireAuth, async (req, res) => {
-  const data = await readJson(authFilePath, { users: [] });
+  const data = await loadAuthStore();
   const user = (data.users || []).find((u) => u.username === req.user.username);
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json({
@@ -1091,73 +1127,69 @@ app.get("/auth/me", requireAuth, async (req, res) => {
 
 // ---------- Admin users ----------
 app.get("/admin/users", requireAuth, requireAdmin, async (_req, res) => {
-  const { users = [] } = await readJson(authFilePath, { users: [] });
-  res.json(
-    users.map((u) => ({
-      id: u.id,
-      username: u.username,
-      role: u.role || "user",
-      status: u.status || "active",
-      mailboxes: u.mailboxes || [],
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt,
-    }))
-  );
+  const { users = [] } = await loadAuthStore();
+  res.json(users.map((u) => sanitizeUserForResponse(u)));
 });
 
 app.post("/admin/users", requireAuth, requireAdmin, async (req, res) => {
   const { username = "", password = "", role = "user", status = "active" } = req.body || {};
-  if (!username || !password) {
+  const usernameValue = String(username || "").trim();
+  const passwordValue = String(password || "");
+  if (!usernameValue || !passwordValue) {
     return res.status(400).json({ message: "Username and password are required" });
   }
-  const payload = await readJson(authFilePath, { users: [] });
-  if ((payload.users || []).some((u) => u.username === username)) {
+  const payload = await loadAuthStore();
+  const usernameKey = usernameValue.toLowerCase();
+  if ((payload.users || []).some((u) => String(u.username || "").toLowerCase() === usernameKey)) {
     return res.status(409).json({ message: "Username already exists" });
   }
   const salt = cryptoSalt();
   const now = new Date().toISOString();
   const newUser = {
     id: uuid(),
-    username,
-    passwordHash: hashPassword(password, salt),
+    username: usernameValue,
+    passwordHash: hashPassword(passwordValue, salt),
     salt,
-    role,
-    status,
+    role: normalizeUserRole(role),
+    status: normalizeUserStatus(status),
     mailboxes: [],
     createdAt: now,
     updatedAt: now,
   };
+  payload.users = Array.isArray(payload.users) ? payload.users : [];
   payload.users.push(newUser);
-  await writeJson(authFilePath, payload);
-  res.status(201).json({ message: "User created successfully", user: newUser });
+  await saveAuthStore(payload);
+  res.status(201).json({ message: "User created successfully", user: sanitizeUserForResponse(newUser) });
 });
 
 app.put("/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const updates = req.body || {};
-  const payload = await readJson(authFilePath, { users: [] });
+  const payload = await loadAuthStore();
   const idx = payload.users.findIndex((u) => u.id === id);
   if (idx === -1) return res.status(404).json({ message: "User not found" });
-  if (updates.username && updates.username !== payload.users[idx].username) {
-    if (payload.users.some((u) => u.username === updates.username)) {
+  const usernameCandidate = updates.username ? String(updates.username).trim() : "";
+  if (usernameCandidate && usernameCandidate !== payload.users[idx].username) {
+    const usernameKey = usernameCandidate.toLowerCase();
+    if (payload.users.some((u) => String(u.username || "").toLowerCase() === usernameKey)) {
       return res.status(409).json({ message: "Username already exists" });
     }
-    payload.users[idx].username = updates.username;
+    payload.users[idx].username = usernameCandidate;
   }
-  if (updates.role) payload.users[idx].role = updates.role;
-  if (updates.status) payload.users[idx].status = updates.status;
+  if (updates.role) payload.users[idx].role = normalizeUserRole(updates.role);
+  if (updates.status) payload.users[idx].status = normalizeUserStatus(updates.status);
   payload.users[idx].updatedAt = new Date().toISOString();
-  await writeJson(authFilePath, payload);
+  await saveAuthStore(payload);
   res.json({ message: "User updated successfully" });
 });
 
 app.delete("/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const payload = await readJson(authFilePath, { users: [] });
+  const payload = await loadAuthStore();
   const idx = payload.users.findIndex((u) => u.id === id);
   if (idx === -1) return res.status(404).json({ message: "User not found" });
   const deleted = payload.users.splice(idx, 1)[0];
-  await writeJson(authFilePath, payload);
+  await saveAuthStore(payload);
   for (const [token, session] of sessions.entries()) {
     if (session.username === deleted.username) sessions.delete(token);
   }
@@ -1168,14 +1200,14 @@ app.post("/admin/users/:id/change-password", requireAuth, requireAdmin, async (r
   const { id } = req.params;
   const { newPassword = "" } = req.body || {};
   if (!newPassword) return res.status(400).json({ message: "New password is required" });
-  const payload = await readJson(authFilePath, { users: [] });
+  const payload = await loadAuthStore();
   const user = payload.users.find((u) => u.id === id);
   if (!user) return res.status(404).json({ message: "User not found" });
   const salt = cryptoSalt();
   user.salt = salt;
   user.passwordHash = hashPassword(newPassword, salt);
   user.updatedAt = new Date().toISOString();
-  await writeJson(authFilePath, payload);
+  await saveAuthStore(payload);
   res.json({ message: "Password updated successfully" });
 });
 
@@ -1360,7 +1392,7 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
       .json({ message: `Invalid recipient(s): ${invalidRecipients.slice(0, 5).join(", ")}` });
   }
   const owner = req.user.role === "admin" && req.body.owner ? req.body.owner : req.user.username;
-  const users = (await readJson(authFilePath, { users: [] })).users || [];
+  const users = (await loadAuthStore()).users || [];
   if (!users.some((u) => u.username === owner)) {
     return res.status(400).json({ message: `Unknown owner ${owner}` });
   }
@@ -1641,7 +1673,7 @@ app.post("/admin/jobs/replay", requireAuth, requireAdmin, async (req, res) => {
 
 // ---------- Overview & health ----------
 app.get("/admin/overview", requireAuth, requireAdmin, async (_req, res) => {
-  const users = (await readJson(authFilePath, { users: [] })).users || [];
+  const users = (await loadAuthStore()).users || [];
   const jobsRaw = (await readJson(jobsFilePath, { jobs: [] })).jobs || [];
   const jobs = await Promise.all(
     jobsRaw.map(async (job) => {
