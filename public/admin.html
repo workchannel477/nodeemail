@@ -9,6 +9,7 @@
     <script defer src="./admin.js"></script>
     <script defer src="./alpinejs.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<<<<<<< HEAD
   </head>
   <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 py-10" x-data="adminApp()" x-init="init()">
@@ -22,32 +23,65 @@
             <i class="ti ti-home"></i> Home
           </button>
           <button @click="openUserPanel" class="inline-flex items-center gap-2 rounded-lg border border-indigo-300 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
+=======
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-10" x-data="adminApp()" x-init="init()" x-cloak>
+      <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-800">Admin Control Panel</h1>
+          <p class="text-gray-600">Users, credits, providers, and system control</p>
+        </div>
+        <div class="flex gap-3">
+          <button @click="redirectHome" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:border-teal-400 hover:text-teal-600">
+            <i class="ti ti-home"></i> Home
+          </button>
+          <button @click="openUserPanel" class="inline-flex items-center gap-2 rounded-lg border border-teal-300 px-4 py-2 text-sm text-teal-600 hover:bg-teal-50">
+>>>>>>> f8d4db3c (New updates.)
             <i class="ti ti-user"></i> User Panel
           </button>
         </div>
       </header>
 
+<<<<<<< HEAD
       <!-- Loading State -->
       <template x-if="!isReady">
         <div class="flex items-center justify-center py-20">
           <div class="text-center">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+=======
+      <template x-if="!isReady">
+        <div class="flex items-center justify-center py-20">
+          <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
+>>>>>>> f8d4db3c (New updates.)
             <p class="mt-4 text-gray-600">Loading admin panel...</p>
           </div>
         </div>
       </template>
 
+<<<<<<< HEAD
       <!-- Login Form -->
       <template x-if="isReady && !token">
         <section class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg mx-auto">
           <div class="text-center mb-6">
             <i class="ti ti-shield-lock text-5xl text-indigo-500 mb-4"></i>
+=======
+      <template x-if="isReady && !token">
+        <section class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg mx-auto">
+          <div class="text-center mb-6">
+            <i class="ti ti-shield-lock text-5xl text-teal-500 mb-4"></i>
+>>>>>>> f8d4db3c (New updates.)
             <h2 class="text-2xl font-semibold text-gray-800">Admin Login</h2>
             <p class="text-gray-500 mt-2">Sign in with administrator credentials</p>
           </div>
           <form class="space-y-5" @submit.prevent="login">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+<<<<<<< HEAD
               <input type="text" x-model.trim="loginForm.username" 
                      class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                      placeholder="Enter admin username" required />
@@ -66,20 +100,38 @@
               <span x-show="busy" class="inline-flex items-center justify-center gap-2">
                 <i class="ti ti-loader animate-spin"></i> Authenticating...
               </span>
+=======
+              <input type="text" x-model.trim="loginForm.username" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter admin username" required />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input type="password" x-model.trim="loginForm.password" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter password" required />
+            </div>
+            <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-3 rounded-lg transition duration-200" :disabled="busy">
+              <span x-show="!busy" class="inline-flex items-center justify-center gap-2"><i class="ti ti-login"></i> Sign In</span>
+              <span x-show="busy" class="inline-flex items-center justify-center gap-2"><i class="ti ti-loader animate-spin"></i> Authenticating...</span>
+>>>>>>> f8d4db3c (New updates.)
             </button>
             <p class="text-sm text-red-600 text-center" x-show="error" x-text="error"></p>
           </form>
         </section>
       </template>
 
+<<<<<<< HEAD
       <!-- Main Admin Dashboard -->
       <template x-if="isReady && token">
         <div class="space-y-8">
           <!-- Header Stats -->
+=======
+      <template x-if="isReady && token">
+        <div class="space-y-8">
+          <!-- Stats -->
+>>>>>>> f8d4db3c (New updates.)
           <section class="bg-white shadow rounded-xl p-6">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div>
                 <div class="flex items-center gap-3 mb-2">
+<<<<<<< HEAD
                   <i class="ti ti-user-cog text-2xl text-indigo-500"></i>
                   <h2 class="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
                 </div>
@@ -94,10 +146,23 @@
                 </button>
                 <button @click="logout" 
                         class="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100">
+=======
+                  <i class="ti ti-user-cog text-2xl text-teal-500"></i>
+                  <h2 class="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
+                </div>
+                <p class="text-gray-600">Signed in as <span class="font-semibold" x-text="user?.username"></span> &bull; Role: <span class="capitalize font-semibold" x-text="user?.role"></span></p>
+              </div>
+              <div class="flex gap-3 flex-wrap">
+                <button @click="fetchOverview" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100" :disabled="busy">
+                  <i class="ti ti-refresh" :class="{ 'animate-spin': busy }"></i> Refresh
+                </button>
+                <button @click="logout" class="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100">
+>>>>>>> f8d4db3c (New updates.)
                   <i class="ti ti-logout"></i> Logout
                 </button>
               </div>
             </div>
+<<<<<<< HEAD
 
             <!-- Stats Grid -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
@@ -107,33 +172,51 @@
                     <p class="text-sm text-gray-500">Total Users</p>
                     <p class="text-2xl font-bold text-gray-800" x-text="stats.totalUsers || 0"></p>
                   </div>
+=======
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <div class="bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                  <div><p class="text-sm text-gray-500">Total Users</p><p class="text-2xl font-bold text-gray-800" x-text="stats.totalUsers || 0"></p></div>
+>>>>>>> f8d4db3c (New updates.)
                   <i class="ti ti-users text-gray-400 text-xl"></i>
                 </div>
               </div>
               <div class="bg-gray-50 rounded-lg p-4">
                 <div class="flex items-center justify-between">
+<<<<<<< HEAD
                   <div>
                     <p class="text-sm text-gray-500">Active Jobs</p>
                     <p class="text-2xl font-bold text-gray-800" x-text="stats.totalJobs || 0"></p>
                   </div>
+=======
+                  <div><p class="text-sm text-gray-500">Active Jobs</p><p class="text-2xl font-bold text-gray-800" x-text="stats.totalJobs || 0"></p></div>
+>>>>>>> f8d4db3c (New updates.)
                   <i class="ti ti-mail text-gray-400 text-xl"></i>
                 </div>
               </div>
               <div class="bg-gray-50 rounded-lg p-4">
                 <div class="flex items-center justify-between">
+<<<<<<< HEAD
                   <div>
                     <p class="text-sm text-gray-500">IP Proxies</p>
                     <p class="text-2xl font-bold text-gray-800" x-text="stats.proxyCount || 0"></p>
                   </div>
+=======
+                  <div><p class="text-sm text-gray-500">IP Proxies</p><p class="text-2xl font-bold text-gray-800" x-text="stats.proxyCount || 0"></p></div>
+>>>>>>> f8d4db3c (New updates.)
                   <i class="ti ti-rotate-clockwise text-gray-400 text-xl"></i>
                 </div>
               </div>
               <div class="bg-gray-50 rounded-lg p-4">
                 <div class="flex items-center justify-between">
+<<<<<<< HEAD
                   <div>
                     <p class="text-sm text-gray-500">Active Sessions</p>
                     <p class="text-2xl font-bold text-gray-800" x-text="stats.sessionCount || 0"></p>
                   </div>
+=======
+                  <div><p class="text-sm text-gray-500">Active Sessions</p><p class="text-2xl font-bold text-gray-800" x-text="stats.sessionCount || 0"></p></div>
+>>>>>>> f8d4db3c (New updates.)
                   <i class="ti ti-clock text-gray-400 text-xl"></i>
                 </div>
               </div>
@@ -144,6 +227,7 @@
           <section class="bg-white shadow rounded-xl p-6">
             <div class="flex items-center justify-between mb-6">
               <div class="flex items-center gap-3">
+<<<<<<< HEAD
                 <i class="ti ti-users text-2xl text-indigo-500"></i>
                 <h2 class="text-xl font-semibold text-gray-800">User Management</h2>
               </div>
@@ -156,18 +240,34 @@
             <!-- User Table -->
             <div class="overflow-x-auto rounded-lg border border-gray-200">
               <div class="overflow-x-auto">
+=======
+                <i class="ti ti-users text-2xl text-teal-500"></i>
+                <h2 class="text-xl font-semibold text-gray-800">User Management</h2>
+              </div>
+              <button @click="showAddUserModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                <i class="ti ti-plus"></i> Add User
+              </button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+>>>>>>> f8d4db3c (New updates.)
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+<<<<<<< HEAD
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mailboxes</th>
+=======
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Credits</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost/Email</th>
+>>>>>>> f8d4db3c (New updates.)
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
+<<<<<<< HEAD
                   <template x-for="user in overview.users" :key="user.id">
                     <tr class="hover:bg-gray-50">
                       <td class="px-6 py-4 whitespace-nowrap">
@@ -208,12 +308,30 @@
                                   class="text-red-600 hover:text-red-900">
                             <i class="ti ti-trash"></i>
                           </button>
+=======
+                  <template x-for="u in overview.users" :key="u.id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center"><i class="ti ti-user mr-3 text-gray-400"></i><span class="font-medium text-gray-900" x-text="u.username"></span></div></td>
+                      <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="u.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'" x-text="u.role"></span></td>
+                      <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="u.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"><i class="ti ti-circle-filled text-xs mr-1"></i><span x-text="u.status"></span></span></td>
+                      <td class="px-6 py-4 whitespace-nowrap"><span class="font-semibold" x-text="u.credits ?? 0"></span> <span class="text-xs text-gray-500" x-text="`(${u.creditsUsed || 0} used)`"></span></td>
+                      <td class="px-6 py-4 whitespace-nowrap" x-text="u.costPerEmail ?? 1"></td>
+                      <td class="px-6 py-4 whitespace-nowrap text-gray-500 text-sm" x-text="formatDate(u.createdAt)"></td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex gap-1">
+                          <button @click="editUser(u)" class="text-teal-600 hover:text-teal-900 p-1" title="Edit"><i class="ti ti-edit"></i></button>
+                          <button @click="openChangePasswordModal(u)" class="text-blue-600 hover:text-blue-900 p-1" title="Change password"><i class="ti ti-key"></i></button>
+                          <button @click="openCreditsModal(u)" class="text-amber-600 hover:text-amber-900 p-1" title="Manage credits"><i class="ti ti-coins"></i></button>
+                          <button @click="openFeaturesModal(u)" class="text-gray-600 hover:text-gray-900 p-1" title="Manage features"><i class="ti ti-settings"></i></button>
+                          <button @click="deleteUser(u.id)" class="text-red-600 hover:text-red-900 p-1" title="Delete"><i class="ti ti-trash"></i></button>
+>>>>>>> f8d4db3c (New updates.)
                         </div>
                       </td>
                     </tr>
                   </template>
                 </tbody>
               </table>
+<<<<<<< HEAD
               </div>
             </div>
             <template x-if="!overview.users.length">
@@ -269,6 +387,83 @@ http://host:port"></textarea>
                   <p class="font-semibold" x-text="ipRotation.currentIndex || 0"></p>
                 </div>
               </div>
+=======
+            </div>
+            <template x-if="!overview.users?.length">
+              <div class="text-center py-12"><i class="ti ti-users-off text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">No users found</p></div>
+            </template>
+          </section>
+
+          <!-- Credits & Features Overview -->
+          <section class="bg-white shadow rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <i class="ti ti-coins text-2xl text-teal-500"></i>
+                <div>
+                  <h2 class="text-xl font-semibold text-gray-800">Credits & Features</h2>
+                  <p class="text-sm text-gray-500">Manage per-user credits, per-email cost, and feature toggles.</p>
+                </div>
+              </div>
+              <button @click="loadCreditData" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100">
+                <i class="ti ti-refresh"></i> Refresh
+              </button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Credits</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Used</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Per Email</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachments</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rich Editor</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Max/Job</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <template x-for="c in creditData" :key="c.id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 font-medium" x-text="c.username"></td>
+                      <td class="px-4 py-3"><span class="font-semibold" x-text="c.credits"></span></td>
+                      <td class="px-4 py-3 text-gray-500" x-text="c.creditsUsed"></td>
+                      <td class="px-4 py-3" x-text="c.costPerEmail"></td>
+                      <td class="px-4 py-3"><span :class="c.features?.attachments ? 'text-green-600' : 'text-red-600'" x-text="c.features?.attachments ? 'Yes' : 'No'"></span></td>
+                      <td class="px-4 py-3"><span :class="c.features?.richEditor ? 'text-green-600' : 'text-red-600'" x-text="c.features?.richEditor ? 'Yes' : 'No'"></span></td>
+                      <td class="px-4 py-3" x-text="c.features?.maxRecipientsPerJob || 500"></td>
+                      <td class="px-4 py-3">
+                        <div class="flex gap-1">
+                          <button @click="openCreditsModal({id: c.id, username: c.username, credits: c.credits, costPerEmail: c.costPerEmail})" class="text-teal-600 hover:text-teal-900 p-1" title="Edit credits"><i class="ti ti-coins"></i></button>
+                          <button @click="openFeaturesModal({id: c.id, username: c.username, features: c.features})" class="text-gray-600 hover:text-gray-900 p-1" title="Edit features"><i class="ti ti-settings"></i></button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <template x-if="!creditData.length">
+              <div class="text-center py-8"><p class="text-gray-500">No credit data loaded.</p></div>
+            </template>
+          </section>
+
+          <!-- IP Rotation -->
+          <section class="bg-white shadow rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <i class="ti ti-rotate-clockwise text-2xl text-teal-500"></i>
+                <h2 class="text-xl font-semibold text-gray-800">IP Rotation</h2>
+              </div>
+            </div>
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-3">Proxy List (One per line)</label>
+              <textarea x-model="ipForm.proxies" rows="6" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono text-sm" placeholder="http://user:pass@host:port\nsocks5://host:port"></textarea>
+            </div>
+            <div class="flex gap-3">
+              <button @click="updateIPRotation" class="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700"><i class="ti ti-device-floppy"></i> Save Proxies</button>
+              <button @click="loadIPRotation" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"><i class="ti ti-refresh"></i> Load Current</button>
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </section>
 
@@ -276,6 +471,7 @@ http://host:port"></textarea>
           <section class="bg-white shadow rounded-xl p-6">
             <div class="flex items-center justify-between mb-6">
               <div class="flex items-center gap-3">
+<<<<<<< HEAD
                 <i class="ti ti-mail-cog text-2xl text-indigo-500"></i>
                 <h2 class="text-xl font-semibold text-gray-800">SMTP Pool & Rotation</h2>
               </div>
@@ -285,10 +481,18 @@ http://host:port"></textarea>
               </button>
             </div>
 
+=======
+                <i class="ti ti-mail-cog text-2xl text-teal-500"></i>
+                <h2 class="text-xl font-semibold text-gray-800">SMTP Pool</h2>
+              </div>
+              <button @click="loadSmtpPool" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"><i class="ti ti-refresh"></i> Refresh</button>
+            </div>
+>>>>>>> f8d4db3c (New updates.)
             <div class="grid gap-4 md:grid-cols-3 mb-6">
               <div class="bg-gray-50 rounded-lg p-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Rotate after (emails)</label>
                 <div class="flex gap-2">
+<<<<<<< HEAD
                   <input type="number" min="1" x-model.number="smtpPool.rotateAfter"
                          class="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                   <button @click="updateSmtpRotation"
@@ -309,10 +513,20 @@ http://host:port"></textarea>
               </div>
             </div>
 
+=======
+                  <input type="number" min="1" x-model.number="smtpPool.rotateAfter" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  <button @click="updateSmtpRotation" class="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Save</button>
+                </div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4"><p class="text-sm text-gray-500">Configured servers</p><p class="text-2xl font-bold text-gray-800" x-text="smtpPool.servers?.length || 0"></p></div>
+              <div class="bg-gray-50 rounded-lg p-4"><p class="text-sm text-gray-500">Rotation progress</p><p class="text-base text-gray-800"><span class="font-semibold" x-text="smtpPool.sentSinceRotation || 0"></span> on server <span class="font-semibold" x-text="(smtpPool.currentIndex || 0) + 1"></span></p></div>
+            </div>
+>>>>>>> f8d4db3c (New updates.)
             <div class="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Add SMTP server</h3>
                 <div class="space-y-4">
+<<<<<<< HEAD
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
                     <input type="text" x-model="smtpForm.label" placeholder="Mailtrap / Postmark / Sender"
@@ -390,10 +604,40 @@ http://host:port"></textarea>
                 <template x-if="!smtpPool.servers?.length">
                   <div class="text-center py-8 text-gray-500">No SMTP servers configured yet.</div>
                 </template>
+=======
+                  <input type="text" x-model="smtpForm.label" placeholder="Label" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  <div class="grid grid-cols-2 gap-3">
+                    <input type="email" x-model="smtpForm.from" placeholder="From" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input type="number" x-model.number="smtpForm.port" placeholder="Port" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <input type="text" x-model="smtpForm.host" placeholder="smtp.example.com" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  <div class="grid grid-cols-2 gap-3">
+                    <input type="text" x-model="smtpForm.username" placeholder="Username" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input type="password" x-model="smtpForm.password" placeholder="Password" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <button @click="addSmtp" class="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Add to rotation</button>
+                </div>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Active SMTP servers</h3>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Label</th><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Host</th><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 bg-white">
+                      <template x-for="server in smtpPool.servers" :key="server.id">
+                        <tr><td class="px-4 py-2 whitespace-nowrap" x-text="server.label"></td><td class="px-4 py-2 whitespace-nowrap" x-text="server.host"></td><td class="px-4 py-2"><button @click="deleteSmtp(server.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"><i class="ti ti-trash"></i></button></td></tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+>>>>>>> f8d4db3c (New updates.)
               </div>
             </div>
           </section>
 
+<<<<<<< HEAD
           <!-- Mail Providers & APIs -->
           <section class="bg-white shadow rounded-xl p-6">
             <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
@@ -473,10 +717,43 @@ http://host:port"></textarea>
                           </button>
                         </div>
                       </td>
+=======
+          <!-- Mail Providers -->
+          <section class="bg-white shadow rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+              <div class="flex items-center gap-3">
+                <i class="ti ti-mail-forward text-2xl text-teal-500"></i>
+                <div><h2 class="text-xl font-semibold text-gray-800">Mail Providers</h2><p class="text-sm text-gray-500">Resend API and SMTP with quotas.</p></div>
+              </div>
+              <button @click="openProviderForm()" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-500"><i class="ti ti-plus"></i> Add provider</button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Provider</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Quotas</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Usage</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th></tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <template x-if="!mailProviders.length">
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">No providers configured.</td></tr>
+                  </template>
+                  <template x-for="provider in mailProviders" :key="provider.id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-5 py-4"><div class="font-semibold" x-text="provider.name"></div></td>
+                      <td class="px-5 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="provider.type === 'resend' ? 'bg-sky-100 text-sky-800' : 'bg-blue-100 text-blue-800'" x-text="provider.type?.toUpperCase()"></span></td>
+                      <td class="px-5 py-4 text-sm"><div>Per min: <span class="font-semibold" x-text="provider.quotaPerMinute || '∞'"></span></div><div>Per day: <span class="font-semibold" x-text="provider.quotaPerDay || '∞'"></span></div></td>
+                      <td class="px-5 py-4 text-sm text-gray-700" x-text="providerUsageSummary(provider)"></td>
+                      <td class="px-5 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="provider.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'"><i class="ti ti-circle-filled text-xs mr-1"></i><span x-text="provider.enabled ? 'Enabled' : 'Disabled'"></span></span></td>
+                      <td class="px-5 py-4"><div class="flex flex-wrap gap-2">
+                        <button @click="openProviderForm(provider)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-teal-50 text-teal-600 rounded hover:bg-teal-100"><i class="ti ti-edit"></i> Manage</button>
+                        <button @click="resetProviderUsage(provider.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-amber-50 text-amber-700 rounded hover:bg-amber-100"><i class="ti ti-restore"></i> Reset</button>
+                        <button @click="deleteProvider(provider.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"><i class="ti ti-trash"></i></button>
+                      </div></td>
+>>>>>>> f8d4db3c (New updates.)
                     </tr>
                   </template>
                 </tbody>
               </table>
+<<<<<<< HEAD
               </div>
             </div>
             <p class="mt-4 text-xs text-gray-500">Providers rotate per batch. If all quotas are exhausted the job will fail fast so you can adjust limits.</p>
@@ -504,10 +781,29 @@ http://host:port"></textarea>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email Count (Last Minute)</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
+=======
+            </div>
+          </section>
+
+          <!-- Rate Limits -->
+          <section class="bg-white shadow rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <i class="ti ti-speedometer text-2xl text-teal-500"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Rate Limits</h2>
+              </div>
+              <button @click="resetAllRateLimits" class="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><i class="ti ti-eraser"></i> Reset All</button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Count (Last Minute)</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr>
+>>>>>>> f8d4db3c (New updates.)
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <template x-for="[username, timestamps] in Object.entries(rateLimits.limits || {})" :key="username">
                     <tr class="hover:bg-gray-50">
+<<<<<<< HEAD
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                           <i class="ti ti-user mr-3 text-gray-400"></i>
@@ -527,10 +823,16 @@ http://host:port"></textarea>
                           <i class="ti ti-eraser"></i> Reset
                         </button>
                       </td>
+=======
+                      <td class="px-6 py-4 whitespace-nowrap"><i class="ti ti-user mr-3 text-gray-400"></i><span class="font-medium" x-text="username"></span></td>
+                      <td class="px-6 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="timestamps.length > 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'"><span x-text="timestamps.length"></span></span></td>
+                      <td class="px-6 py-4"><button @click="resetUserRateLimit(username)" class="inline-flex items-center gap-2 px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded hover:bg-blue-200"><i class="ti ti-eraser"></i> Reset</button></td>
+>>>>>>> f8d4db3c (New updates.)
                     </tr>
                   </template>
                 </tbody>
               </table>
+<<<<<<< HEAD
               </div>
             </div>
             <template x-if="!Object.keys(rateLimits.limits || {}).length">
@@ -588,6 +890,8 @@ http://host:port"></textarea>
                   </div>
                 </template>
               </div>
+=======
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </section>
 
@@ -595,6 +899,7 @@ http://host:port"></textarea>
           <section class="bg-white shadow rounded-xl p-6">
             <div class="flex items-center justify-between mb-6">
               <div class="flex items-center gap-3">
+<<<<<<< HEAD
                 <i class="ti ti-mail text-2xl text-indigo-500"></i>
                 <h2 class="text-xl font-semibold text-gray-800">Email Jobs Overview</h2>
               </div>
@@ -629,10 +934,27 @@ http://host:port"></textarea>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sent</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
+=======
+                <i class="ti ti-mail text-2xl text-teal-500"></i>
+                <h2 class="text-xl font-semibold text-gray-800">Email Jobs</h2>
+              </div>
+            </div>
+            <div class="mb-6 flex gap-3 flex-wrap">
+              <button @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">All</button>
+              <button @click="activeTab = 'pending'" :class="activeTab === 'pending' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">Pending</button>
+              <button @click="activeTab = 'sent'" :class="activeTab === 'sent' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">Sent</button>
+              <button @click="activeTab = 'failed'" :class="activeTab === 'failed' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">Failed</button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Summary</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr>
+>>>>>>> f8d4db3c (New updates.)
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <template x-for="job in filteredJobs" :key="job.id">
                     <tr class="hover:bg-gray-50">
+<<<<<<< HEAD
                       <td class="px-6 py-4">
                         <div class="max-w-xs truncate" x-text="job.subject"></div>
                       </td>
@@ -674,11 +996,26 @@ http://host:port"></textarea>
                           </button>
                         </div>
                       </td>
+=======
+                      <td class="px-6 py-4"><div class="max-w-xs truncate font-medium" x-text="job.subject"></div></td>
+                      <td class="px-6 py-4 whitespace-nowrap" x-text="job.owner"></td>
+                      <td class="px-6 py-4"><div class="max-w-xs truncate text-sm" x-text="(job.recipientsPreview || []).slice(0, 3).join(', ')"></div><div class="text-xs text-gray-400" x-text="job.recipientsCount ? `(${job.recipientsCount} total)` : ''"></div></td>
+                      <td class="px-6 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="{'bg-green-100 text-green-800': job.status === 'sent','bg-yellow-100 text-yellow-800': job.status === 'pending','bg-red-100 text-red-800': job.status === 'failed','bg-blue-100 text-blue-800': job.status === 'sending'}"><span x-text="job.status"></span></span></td>
+                      <td class="px-6 py-4 text-sm text-gray-700" x-text="formatJobSummary(job)"></td>
+                      <td class="px-6 py-4 whitespace-nowrap"><div class="flex gap-2">
+                        <button @click="sendJob(job.id)" :disabled="job.status === 'sending'" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-green-100 text-green-600 rounded hover:bg-green-200 disabled:opacity-50"><i class="ti ti-send"></i></button>
+                        <button @click="clearRecipientLog(job.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-amber-100 text-amber-700 rounded hover:bg-amber-200"><i class="ti ti-eraser"></i></button>
+                        <button @click="deleteJobView(job.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"><i class="ti ti-trash"></i></button>
+                      </div></td>
+>>>>>>> f8d4db3c (New updates.)
                     </tr>
                   </template>
                 </tbody>
               </table>
+<<<<<<< HEAD
               </div>
+=======
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </section>
         </div>
@@ -689,6 +1026,7 @@ http://host:port"></textarea>
         <div class="relative top-16 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800" x-text="editingProviderId ? 'Edit Mail Provider' : 'Add Mail Provider'"></h3>
+<<<<<<< HEAD
             <button @click="cancelProviderForm" class="text-gray-400 hover:text-gray-600">
               <i class="ti ti-x text-xl"></i>
             </button>
@@ -746,6 +1084,28 @@ http://host:port"></textarea>
                       class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                 Cancel
               </button>
+=======
+            <button @click="cancelProviderForm" class="text-gray-400 hover:text-gray-600"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <form @submit.prevent="saveProvider" class="space-y-4">
+            <div class="grid md:grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label><input type="text" x-model="providerForm.name" required class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+              <div><label class="block text-sm font-medium text-gray-700 mb-1">Type</label><select x-model="providerForm.type" @change="handleProviderTypeChange" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="resend">Resend API</option><option value="smtp">SMTP</option></select></div>
+            </div>
+            <div class="flex items-center gap-3"><input id="provider-enabled" type="checkbox" class="h-4 w-4 text-teal-600 border-gray-300 rounded" x-model="providerForm.enabled"><label for="provider-enabled" class="text-sm text-gray-700">Enabled</label></div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 mb-1">Quota per minute</label><input type="number" min="0" x-model.number="providerForm.quotaPerMinute" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+              <div><label class="block text-sm font-medium text-gray-700 mb-1">Quota per day</label><input type="number" min="0" x-model.number="providerForm.quotaPerDay" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            </div>
+            <div class="space-y-4">
+              <template x-for="field in providerConfigFields()" :key="field.key">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1" x-text="field.label"></label><input :type="field.type || 'text'" :placeholder="field.placeholder || ''" x-model="providerForm.config[field.key]" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+              </template>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="submit" class="flex-1 bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700"><span x-text="editingProviderId ? 'Update' : 'Create'"></span></button>
+              <button type="button" @click="cancelProviderForm" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </form>
         </div>
@@ -756,6 +1116,7 @@ http://host:port"></textarea>
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Add New User</h3>
+<<<<<<< HEAD
             <button @click="showAddUserModal = false" class="text-gray-400 hover:text-gray-600">
               <i class="ti ti-x text-xl"></i>
             </button>
@@ -795,6 +1156,20 @@ http://host:port"></textarea>
                       class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                 Cancel
               </button>
+=======
+            <button @click="showAddUserModal = false" class="text-gray-400 hover:text-gray-600"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <form @submit.prevent="createUser" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Username</label><input type="text" x-model="newUser.username" required class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Password</label><input type="password" x-model="newUser.password" required class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Role</label><select x-model="newUser.role" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="user">User</option><option value="admin">Admin</option></select></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Status</label><select x-model="newUser.status" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="active">Active</option><option value="suspended">Suspended</option></select></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Initial Credits</label><input type="number" x-model.number="newUser.credits" min="0" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Cost Per Email</label><input type="number" x-model.number="newUser.costPerEmail" min="1" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="flex-1 bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Create User</button>
+              <button type="button" @click="showAddUserModal = false" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </form>
         </div>
@@ -805,6 +1180,7 @@ http://host:port"></textarea>
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Change Password</h3>
+<<<<<<< HEAD
             <button @click="isChangePasswordModalOpen = false" class="text-gray-400 hover:text-gray-600">
               <i class="ti ti-x text-xl"></i>
             </button>
@@ -826,6 +1202,16 @@ http://host:port"></textarea>
                       class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                 Cancel
               </button>
+=======
+            <button @click="isChangePasswordModalOpen = false" class="text-gray-400 hover:text-gray-600"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <div class="mb-4"><p class="text-gray-600">User: <span class="font-semibold" x-text="selectedUser?.username"></span></p></div>
+          <form @submit.prevent="changeUserPassword" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">New Password</label><input type="password" x-model="passwordForm.newPassword" required class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="flex-1 bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Update Password</button>
+              <button type="button" @click="isChangePasswordModalOpen = false" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </form>
         </div>
@@ -836,6 +1222,7 @@ http://host:port"></textarea>
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Edit User</h3>
+<<<<<<< HEAD
             <button @click="showEditUserModal = false" class="text-gray-400 hover:text-gray-600">
               <i class="ti ti-x text-xl"></i>
             </button>
@@ -870,11 +1257,69 @@ http://host:port"></textarea>
                       class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                 Cancel
               </button>
+=======
+            <button @click="showEditUserModal = false" class="text-gray-400 hover:text-gray-600"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <form @submit.prevent="updateUser" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Username</label><input type="text" x-model="editUserForm.username" required class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Role</label><select x-model="editUserForm.role" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="user">User</option><option value="admin">Admin</option></select></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Status</label><select x-model="editUserForm.status" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"><option value="active">Active</option><option value="suspended">Suspended</option></select></div>
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="flex-1 bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Update</button>
+              <button type="button" @click="showEditUserModal = false" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
+>>>>>>> f8d4db3c (New updates.)
             </div>
           </form>
         </div>
       </div>
+<<<<<<< HEAD
     </div>
 
+=======
+
+      <!-- Credits Modal -->
+      <div x-show="creditsModalVisible" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold text-gray-800">Manage Credits</h3>
+            <button @click="creditsModalVisible = false" class="text-gray-400 hover:text-gray-600"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <div class="mb-4"><p class="text-gray-600">User: <span class="font-semibold" x-text="creditsForm.username"></span></p></div>
+          <form @submit.prevent="saveCredits" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Credits</label><input type="number" x-model.number="creditsForm.credits" min="0" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Cost Per Email</label><input type="number" x-model.number="creditsForm.costPerEmail" min="1" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="flex-1 bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Save</button>
+              <button type="button" @click="creditsModalVisible = false" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Features Modal -->
+      <div x-show="featuresModalVisible" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold text-gray-800">Manage Features</h3>
+            <button @click="featuresModalVisible = false" class="text-gray-400 hover:text-gray-600"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <div class="mb-4"><p class="text-gray-600">User: <span class="font-semibold" x-text="featuresForm.username"></span></p></div>
+          <form @submit.prevent="saveFeatures" class="space-y-4">
+            <div class="flex items-center gap-3"><input id="feat-attach" type="checkbox" class="h-4 w-4 text-teal-600 border-gray-300 rounded" x-model="featuresForm.features.attachments"><label for="feat-attach" class="text-sm text-gray-700">Allow attachments</label></div>
+            <div class="flex items-center gap-3"><input id="feat-editor" type="checkbox" class="h-4 w-4 text-teal-600 border-gray-300 rounded" x-model="featuresForm.features.richEditor"><label for="feat-editor" class="text-sm text-gray-700">Allow rich editor</label></div>
+            <div class="flex items-center gap-3"><input id="feat-batch" type="checkbox" class="h-4 w-4 text-teal-600 border-gray-300 rounded" x-model="featuresForm.features.batchSending"><label for="feat-batch" class="text-sm text-gray-700">Allow batch sending</label></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-2">Max recipients per job</label><input type="number" x-model.number="featuresForm.features.maxRecipientsPerJob" min="1" class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"></div>
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="flex-1 bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Save</button>
+              <button type="button" @click="featuresModalVisible = false" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <p class="mt-8 text-center text-sm text-gray-500" x-show="message" x-text="message"></p>
+      <p class="mt-2 text-center text-sm text-red-600" x-show="error" x-text="error"></p>
+    </div>
+>>>>>>> f8d4db3c (New updates.)
   </body>
 </html>
