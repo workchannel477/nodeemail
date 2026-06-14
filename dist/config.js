@@ -4,7 +4,7 @@
     (typeof API_BASE_OVERRIDE !== 'undefined' ? API_BASE_OVERRIDE : '');
 
   const defaultBase =
-    window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
+    window.location.hostname === 'localhost' ? 'http://localhost:5001' : window.location.origin;
   const base = (rawBase || defaultBase || '').replace(/\/$/, '');
 
   window.API = {

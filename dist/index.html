@@ -1,380 +1,838 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Email Control Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Email Workspace</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./config.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="./admin.js"></script>
+    <script defer src="./alpinejs.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+    />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/trix@2.0.8/dist/trix.css">
+    <script src="https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js"></script>
     <style>
-      .rte-toolbar button {
-        padding: 0.35rem 0.5rem;
-        font-size: 0.75rem;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.35rem;
-        color: #334155;
+      .reveal { animation: rise 0.4s ease both; }
+
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
-      .rte-toolbar button:hover {
-        background: #e2e8f0;
+      trix-editor {
+        min-height: 200px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
       }
-      .rte-area {
-        min-height: 180px;
+      trix-editor:focus {
+        border-color: rgba(15, 118, 110, 0.6);
+        box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.13);
+      }
+      trix-toolbar .trix-button-group {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      trix-toolbar .trix-button--icon {
+        width: 1.8em;
+        height: 1.8em;
+      }
+
+      .upload-zone {
+        border: 2px dashed var(--line);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        transition: border-color 0.2s ease, background 0.2s ease;
+        cursor: pointer;
+      }
+      .upload-zone:hover {
+        border-color: var(--accent);
+        background: rgba(15, 118, 110, 0.04);
+      }
+
+      .tab-btn {
+        padding: 0.4rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: background 0.2s ease, color 0.2s ease;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+      }
+      .tab-btn.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      [x-cloak] { display: none !important; }
+
+      /* Sidebar */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 230px;
+        background: #0d3d39;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.25s ease;
+      }
+      .sidebar .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.6rem 0.9rem;
+        margin: 0 0.5rem;
+        color: rgba(255,255,255,0.7);
+        border-radius: 0.5rem;
+        transition: background 0.15s, color 0.15s;
+        cursor: pointer;
+        font-size: 0.9rem;
+        border: none;
+        background: none;
+        width: auto;
+        text-align: left;
+      }
+      .sidebar .nav-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+      .sidebar .nav-item.active { background: rgba(255,255,255,0.15); color: #fff; font-weight: 600; }
+      .sidebar .nav-item i { font-size: 1.15rem; flex-shrink: 0; }
+
+      .main-area {
+        margin-left: 230px;
+        min-height: 100vh;
+      }
+
+      .mobile-header {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 54px;
+        background: #0d3d39;
+        z-index: 45;
+        align-items: center;
+        padding: 0 1rem;
+        gap: 0.75rem;
+      }
+      .mobile-header button {
+        background: none;
+        border: none;
+        color: rgba(255,255,255,0.85);
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.25rem;
+        line-height: 1;
+      }
+      .mobile-header .title { color: #fff; font-size: 1rem; font-weight: 600; flex: 1; }
+
+      .mobile-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 35;
+      }
+
+      @media (max-width: 1023px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main-area { margin-left: 0; padding-top: 54px; }
+        .mobile-header { display: flex; }
+      }
+    </style>
+      :root {
+        --bg: #f4f8f7;
+        --bg-alt: #e9f1ef;
+        --ink: #12201d;
+        --muted: #4a5f5a;
+        --line: #c9d8d4;
+        --accent: #0f766e;
+        --accent-2: #e07a2d;
+        --surface: rgba(255, 255, 255, 0.86);
+      }
+      * {
+        font-family: "Work Sans", sans-serif;
+      }
+
+      h1,
+      h2,
+      h3,
+      .font-title {
+        font-family: "Sora", sans-serif;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 15% 10%, rgba(15, 118, 110, 0.2), transparent 35%),
+          radial-gradient(circle at 90% 8%, rgba(224, 122, 45, 0.18), transparent 30%),
+          linear-gradient(180deg, var(--bg), var(--bg-alt));
+        color: var(--ink);
+      }
+
+      .ambient-shape {
+        position: fixed;
+        border-radius: 999px;
+        filter: blur(10px);
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.45;
+      }
+
+      .ambient-shape.one {
+        width: 220px;
+        height: 220px;
+        background: rgba(15, 118, 110, 0.25);
+        left: -50px;
+        top: 130px;
+        animation: float 10s ease-in-out infinite;
+      }
+
+      .ambient-shape.two {
+        width: 280px;
+        height: 280px;
+        background: rgba(224, 122, 45, 0.2);
+        right: -60px;
+        top: 380px;
+        animation: float 12s ease-in-out infinite reverse;
+      }
+
+      .surface {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+      * { font-family: "Inter", "Work Sans", sans-serif; }
+
+      body {
+        background: var(--bg-alt);
+        color: var(--ink);
+      }
+
+      .surface {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        backdrop-filter: blur(14px);
+        box-shadow: 0 18px 40px rgba(18, 32, 29, 0.08);
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .surface-soft {
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), #115e59);
+        color: #fff;
+        border-radius: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(15, 118, 110, 0.3);
+        border-radius: 12px;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-radius: 10px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(15, 118, 110, 0.3);
+      }
+
+      .btn-secondary {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: var(--ink);
+        border-radius: 12px;
+        border-radius: 10px;
+      }
+
+      .field {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        padding: 0.65rem 0.8rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .field:focus {
+        outline: none;
+        border-color: rgba(15, 118, 110, 0.6);
+        box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.13);
+      }
+
+      .pill {
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        padding: 0.38rem 0.8rem;
+        padding: 0.3rem 0.8rem;
+        font-size: 0.77rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .reveal {
+        animation: rise 0.5s ease both;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-14px);
+        }
       }
     </style>
   </head>
-  <body class="bg-slate-100 min-h-screen">
-    <div class="max-w-6xl mx-auto px-4 py-10" x-data="dashboardApp()" x-init="init()">
-      <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-semibold text-slate-800">Email Job Dashboard</h1>
-          <p class="text-slate-500">Authenticate, manage outbound jobs, and trigger the sender.</p>
-        </div>
-      </header>
+  <body>
+    <div x-data="dashboardApp()" x-init="init()" x-cloak>
+      <div x-show="token" x-cloak>
+        <!-- Sidebar -->
+        <aside class="sidebar" :class="{ 'open': mobileNavOpen }">
+          <div class="p-4 border-b border-white/10 flex items-start justify-between gap-2">
+            <div>
+              <p class="text-white font-bold text-base flex items-center gap-2">
+                <i class="ti ti-mail-forward text-teal-300"></i> Emailer
+              </p>
+              <p class="text-white/50 text-xs mt-0.5">Signed in as <span x-text="user?.username"></span></p>
+            </div>
+            <button @click="mobileNavOpen = false" class="lg:hidden text-white/50 hover:text-white p-1 shrink-0" aria-label="Close menu">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <nav class="flex-1 overflow-y-auto py-3 space-y-0.5">
+            <template x-for="item in navItems" :key="item.id">
+              <button class="nav-item" :class="{ 'active': currentSection === item.id }" @click="currentSection = item.id; mobileNavOpen = false">
+                <i :class="'ti ' + item.icon"></i>
+                <span x-text="item.label"></span>
+              </button>
+            </template>
+          </nav>
+          <div class="p-3 border-t border-white/10 space-y-1">
+            <div class="flex items-center gap-2 px-3 py-2 text-sm text-white/80">
+              <i class="ti ti-coins text-teal-300"></i>
+              <span class="font-semibold" x-text="userCredits"></span>
+              <span class="text-white/50">credits</span>
+              <span class="text-white/40 text-xs" x-show="creditsPerEmail > 0">@ <span x-text="creditsPerEmail"></span>/ea</span>
+            </div>
+            <button class="nav-item" @click="showTopUp = true; mobileNavOpen = false">
+              <i class="ti ti-coins"></i><span>Top Up</span>
+            </button>
+            <button class="nav-item" x-show="isAdmin" @click="openAdmin">
+              <i class="ti ti-shield-lock"></i><span>Admin Panel</span>
+            </button>
+            <button class="nav-item" @click="logout">
+              <i class="ti ti-logout"></i><span>Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Mobile overlay -->
+        <div x-show="mobileNavOpen" class="mobile-overlay" @click="mobileNavOpen = false"></div>
+
+        <!-- Mobile header -->
+        <header class="mobile-header">
+          <button @click="mobileNavOpen = true" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <span class="title" x-text="currentSectionLabel"></span>
+          <div class="flex items-center gap-2 text-white/70 text-sm">
+            <i class="ti ti-coins"></i>
+            <span class="font-semibold" x-text="userCredits"></span>
+          </div>
+        </header>
+      </div>
 
       <template x-if="!token">
-        <section class="bg-white shadow rounded-lg p-6 w-full max-w-lg mx-auto">
-          <h2 class="text-xl font-medium text-slate-700 mb-4">Log in</h2>
-          <form @submit.prevent="login" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-slate-600">Username</label>
-              <input type="text" x-model.trim="loginForm.username" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-600">Password</label>
-              <input type="password" x-model.trim="loginForm.password" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
-            </div>
-            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded" x-bind:disabled="busy">
-              <span x-show="!busy">Sign in</span>
-              <span x-show="busy">Authenticating...</span>
-            </button>
-            <p class="text-sm text-red-600" x-text="error" x-show="error"></p>
-          </form>
-        </section>
-      </template>
-
-      <template x-if="token">
-        <div class="space-y-8">
-          <div class="bg-white shadow rounded-lg p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p class="text-slate-600">Signed in as <span class="font-semibold" x-text="user?.username"></span></p>
-              <p class="text-sm text-slate-500">Role: <span class="font-semibold capitalize" x-text="user?.role"></span></p>
-            </div>
-            <div class="flex gap-2 flex-wrap">
-              <button class="px-4 py-2 rounded border border-indigo-500 text-indigo-600" @click="refreshProfile" x-bind:disabled="busy">Refresh profile</button>
-              <button class="px-4 py-2 rounded bg-rose-500 text-white" @click="logout">Logout</button>
-            </div>
-          </div>
-
-          <section class="bg-white shadow rounded-lg p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold text-slate-700">Create email job</h2>
-              <span class="text-sm text-slate-400" x-show="busy">Working...</span>
-            </div>
-            <p class="text-sm text-slate-500 mb-4">SMTP credentials rotate automatically (admin-managed). Provide the from name, subject, and recipients for each job.</p>
-            <form class="grid gap-4" @submit.prevent="createJob">
-              <div>
-                <label class="block text-sm font-medium text-slate-600">From name</label>
-                <input type="text" x-model.trim="form.fromName" placeholder="Marketing Team" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
-                <p class="text-xs text-slate-400 mt-1">Admin controls the from email; you only set the display name.</p>
+        <div class="flex items-center justify-center min-h-screen p-4">
+          <section class="surface p-8 w-full max-w-md reveal">
+            <div class="text-center mb-6">
+              <div class="w-14 h-14 rounded-xl bg-teal-100 flex items-center justify-center mx-auto">
+                <i class="ti ti-mail-forward text-2xl text-teal-600"></i>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-600">Reply-To (optional)</label>
-                <input type="email" x-model.trim="form.replyTo" placeholder="reply@example.com" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-600">Subject</label>
-                <input type="text" x-model.trim="form.subject" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-600">Recipients</label>
-                <textarea rows="2" x-model="form.recipients" placeholder="one@example.com, two@example.com" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200" required></textarea>
-              </div>
-              <div class="grid md:grid-cols-2 gap-4">
+              <h1 class="mt-3 text-2xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
+              <p class="mt-1 text-sm text-[var(--muted)]">Sign in to your account</p>
+            </div>
+            <section class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Sign in</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Use your workspace account.</p>
+              <form class="mt-5 space-y-4" @submit.prevent="login">
                 <div>
-                  <label class="block text-sm font-medium text-slate-600">Plain text body</label>
-                  <textarea rows="4" x-model="form.textBody" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:outline-none focus:ring focus:ring-indigo-200"></textarea>
+                  <label class="text-sm font-medium">Username</label>
+                  <input type="text" x-model.trim="loginForm.username" class="field mt-1" required />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-slate-600">HTML body</label>
-                  <div class="mt-1 border border-slate-300 rounded">
-                    <div class="rte-toolbar flex flex-wrap gap-2 px-2 py-2 border-b border-slate-200">
-                      <button type="button" @click="format('bold')">Bold</button>
-                      <button type="button" @click="format('italic')">Italic</button>
-                      <button type="button" @click="format('underline')">Underline</button>
-                      <button type="button" @click="format('insertUnorderedList')">• List</button>
-                      <button type="button" @click="format('insertOrderedList')">1. List</button>
-                      <button type="button" @click="insertImage()">Image</button>
-                      <button type="button" @click="insertLink()">Link</button>
-                      <button type="button" @click="clearHtml()">Clear</button>
-                    </div>
-                    <div x-ref="htmlEditor"
-                         class="rte-area px-3 py-2 focus:outline-none"
-                         contenteditable="true"
-                         @input="form.htmlBody = $event.target.innerHTML"
-                         @blur="form.htmlBody = $event.target.innerHTML"
-                         x-html="form.htmlBody"></div>
-                  </div>
-                  <textarea x-model="form.htmlBody" class="hidden"></textarea>
-                  <p class="text-xs text-slate-400 mt-1">Built-in lightweight editor (no external CDN).</p>
+                  <label class="text-sm font-medium">Password</label>
+                  <input type="password" x-model.trim="loginForm.password" class="field mt-1" required />
                 </div>
-              </div>
-              <button type="submit" class="self-start bg-indigo-600 text-white font-medium px-6 py-2 rounded hover:bg-indigo-500" x-bind:disabled="busy">
-                Save job
-              </button>
-              <p class="text-sm text-green-600" x-text="message" x-show="message"></p>
-              <p class="text-sm text-red-600" x-text="error" x-show="error"></p>
-            </form>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-login mr-1"></i> Sign in</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Authenticating...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+              </form>
           </section>
-
-          <section class="bg-white shadow rounded-lg p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold text-slate-700">Existing jobs</h2>
-              <button class="text-sm text-indigo-600" @click="fetchJobs">Reload</button>
-            </div>
-            <template x-if="!jobs.length">
-              <p class="text-slate-500">No jobs yet. Submit the form above to create one.</p>
-            </template>
-            <div class="overflow-x-auto" x-show="jobs.length">
-              <table class="min-w-full text-sm">
-                <thead>
-                  <tr class="text-left text-slate-500 border-b">
-                    <th class="py-2 pr-4">Subject</th>
-                    <th class="py-2 pr-4">From</th>
-                    <th class="py-2 pr-4">Recipients</th>
-                    <th class="py-2 pr-4">Owner</th>
-                    <th class="py-2 pr-4">Updated</th>
-                    <th class="py-2 pr-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="job in jobs" :key="job.id">
-                    <tr class="border-b last:border-b-0">
-                      <td class="py-2 pr-4 font-medium text-slate-700" x-text="job.subject"></td>
-                      <td class="py-2 pr-4 text-slate-500">
-                        <span x-text="job.fromName || job.from || 'Admin default'"></span>
-                      </td>
-                      <td class="py-2 pr-4 text-slate-500">
-                        <span x-text="job.recipients.join(', ')"></span>
-                      </td>
-                      <td class="py-2 pr-4 text-slate-500" x-text="job.owner"></td>
-                      <td class="py-2 pr-4 text-slate-500" x-text="formatDate(job.updatedAt)"></td>
-                      <td class="py-2 pr-4 flex gap-2 flex-wrap">
-                        <button class="px-3 py-1 bg-emerald-500 text-white rounded" @click="triggerSend(job.id)">Send</button>
-                        <button class="px-3 py-1 bg-rose-500 text-white rounded" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
         </div>
       </template>
-    </div>
 
-    <script>
-      const apiUrl = (path) => (window.API ? window.API.url(path) : path);
-      document.addEventListener('alpine:init', () => {
-        Alpine.data('dashboardApp', () => ({
-          token: localStorage.getItem('mailer_token') || '',
-          user: JSON.parse(localStorage.getItem('mailer_user') || 'null'),
-          jobs: [],
-          busy: false,
-          message: '',
-          error: '',
-          loginForm: { username: '', password: '' },
-          form: {
-            fromName: '',
-            replyTo: '',
-            subject: '',
-            recipients: '',
-            textBody: '',
-            htmlBody: ''
-          },
-          init() {
-            if (this.token) {
-              this.fetchJobs();
-              this.refreshProfile();
-            }
-            this.$nextTick(() => {
-              if (this.$refs.htmlEditor) {
-                this.$refs.htmlEditor.innerHTML = this.form.htmlBody || '';
-              }
-            });
-          },
-          get isAdmin() {
-            return this.user?.role === 'admin';
-          },
-          headers() {
-            const headers = { 'Content-Type': 'application/json' };
-            if (this.token) headers.Authorization = `Bearer ${this.token}`;
-            return headers;
-          },
-          async login() {
-            this.error = '';
-            this.busy = true;
-            try {
-              const response = await fetch(apiUrl('/auth/login'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.loginForm)
-              });
-              if (!response.ok) throw new Error('Invalid username or password');
-              const data = await response.json();
-              this.token = data.token;
-              this.user = { username: data.username, role: data.role, mailboxes: data.mailboxes || [] };
-              localStorage.setItem('mailer_token', this.token);
-              localStorage.setItem('mailer_user', JSON.stringify(this.user));
-              this.loginForm.password = '';
-              await this.fetchJobs();
-            } catch (error) {
-              this.error = error.message;
-            } finally {
-              this.busy = false;
-            }
-          },
-          async logout() {
-            if (this.token) {
-              try {
-                await fetch(apiUrl('/auth/logout'), { method: 'POST', headers: this.headers() });
-              } catch (error) {
-                console.warn(error);
-              }
-            }
-            localStorage.removeItem('mailer_token');
-            localStorage.removeItem('mailer_user');
-            this.token = '';
-            this.user = null;
-            this.jobs = [];
-          },
-          async refreshProfile() {
-            if (!this.token) return;
-            try {
-              const response = await fetch(apiUrl('/auth/me'), { headers: this.headers() });
-              if (!response.ok) throw new Error('Unable to fetch profile');
-              const data = await response.json();
-              this.user = data;
-              localStorage.setItem('mailer_user', JSON.stringify(data));
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          async fetchJobs() {
-            if (!this.token) return;
-            this.error = '';
-            try {
-              const response = await fetch(apiUrl('/api/jobs'), { headers: this.headers() });
-              if (!response.ok) throw new Error('Unable to load jobs');
-              this.jobs = await response.json();
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          async createJob() {
-            this.error = '';
-            this.message = '';
-            if (!this.form.fromName || !this.form.subject || !this.form.recipients) {
-              this.error = 'From name, subject, and recipients are required.';
-              return;
-            }
-            this.busy = true;
-            try {
-              const response = await fetch(apiUrl('/api/jobs'), {
-                method: 'POST',
-                headers: this.headers(),
-                body: JSON.stringify(this.form)
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.message || 'Failed to create job');
-              Object.keys(this.form).forEach((key) => (this.form[key] = ''));
-              if (this.$refs.htmlEditor) {
-                this.$refs.htmlEditor.innerHTML = '';
-              }
-              this.message = 'Job stored successfully.';
-              setTimeout(() => (this.message = ''), 4000);
-              await Promise.all([this.fetchJobs(), this.refreshProfile()]);
-            } catch (error) {
-              this.error = error.message;
-            } finally {
-              this.busy = false;
-            }
-          },
-          async triggerSend(id) {
-            if (!confirm('Trigger this job now?')) return;
-            try {
-              const response = await fetch(apiUrl(`/api/jobs/${id}/send`), {
-                method: 'POST',
-                headers: this.headers()
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.message || 'Failed to send job');
-              this.message = data.message;
-              setTimeout(() => (this.message = ''), 4000);
-              await this.fetchJobs();
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          async deleteJob(id) {
-            if (!confirm('Delete this job?')) return;
-            try {
-              const response = await fetch(apiUrl(`/api/jobs/${id}`), {
-                method: 'DELETE',
-                headers: this.headers()
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.message || 'Failed to delete job');
-              this.message = data.message;
-              setTimeout(() => (this.message = ''), 4000);
-              await this.fetchJobs();
-            } catch (error) {
-              this.error = error.message;
-            }
-          },
-          formatDate(value) {
-            if (!value) return '-';
-            try {
-              return new Date(value).toLocaleString();
-            } catch (error) {
-              return value;
-            }
-          },
-          format(command) {
-            document.execCommand(command, false, null);
-            if (this.$refs.htmlEditor) {
-              this.form.htmlBody = this.$refs.htmlEditor.innerHTML;
-            }
-          },
-          insertLink() {
-            const url = prompt('Enter URL');
-            if (!url) return;
-            document.execCommand('createLink', false, url);
-            if (this.$refs.htmlEditor) {
-              this.form.htmlBody = this.$refs.htmlEditor.innerHTML;
-            }
-          },
-          insertImage() {
-            const url = prompt('Image URL');
-            if (!url) return;
-            document.execCommand('insertImage', false, url);
-            if (this.$refs.htmlEditor) {
-              this.form.htmlBody = this.$refs.htmlEditor.innerHTML;
-            }
-          },
-          clearHtml() {
-            if (this.$refs.htmlEditor) {
-              this.$refs.htmlEditor.innerHTML = '';
-            }
-            this.form.htmlBody = '';
-          },
-          openAdmin() {
-            window.location.href = '/admin.html';
-          }
-        }));
-      });
-    </script>
+        <template x-if="token">
+          <section class="grid gap-6 lg:grid-cols-12">
+            <div class="space-y-6 lg:col-span-5">
+              <article class="surface reveal p-6">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="font-title text-xl font-semibold">Compose Job</h2>
+              <article class="surface p-5 md:p-6 reveal">
+      <!-- Authenticated content -->
+      <template x-if="token">
+        <div class="main-area">
+          <div class="max-w-5xl mx-auto p-4 lg:p-6 space-y-6">
+
+            <!-- Section: Dashboard -->
+            <section x-show="currentSection === 'dashboard'" class="space-y-6">
+              <template x-if="busy && !jobs.length">
+                <article class="surface p-8 text-center">
+                  <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-teal-500"></div>
+                  <p class="mt-4 text-sm text-[var(--muted)]">Loading dashboard...</p>
+                </article>
+              </template>
+              <template x-if="!busy || jobs.length">
+                <article class="surface p-5 md:p-6">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="text-xl font-bold text-[var(--ink)]">Dashboard</h2>
+                    <p class="text-xs text-[var(--muted)] mt-1">Welcome back, <span class="font-semibold" x-text="user?.username"></span></p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Credits</p>
+                        <p class="text-2xl font-bold text-[var(--ink)]" x-text="userCredits"></p>
+                      </div>
+                      <i class="ti ti-coins text-2xl text-teal-400"></i>
+                    </div>
+                  </div>
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Sent</p>
+                        <p class="text-2xl font-bold text-emerald-700" x-text="metrics.sent"></p>
+                      </div>
+                      <i class="ti ti-send text-2xl text-emerald-400"></i>
+                    </div>
+                  </div>
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Recipients</p>
+                        <p class="text-2xl font-bold text-[var(--ink)]" x-text="metrics.totalRecipients"></p>
+                      </div>
+                      <i class="ti ti-users text-2xl text-blue-400"></i>
+                    </div>
+                  </div>
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
+                        <p class="text-2xl font-bold text-rose-700" x-text="metrics.failed"></p>
+                      </div>
+                      <i class="ti ti-alert-triangle text-2xl text-rose-400"></i>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-6 surface-soft p-4" x-show="metrics.lastJob">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-xs text-[var(--muted)]">Last Job</p>
+                      <p class="font-semibold text-[var(--ink)]" x-text="(metrics.lastJob || {}).subject || 'Untitled'"></p>
+                      <p class="text-xs text-[var(--muted)]" x-text="formatDate((metrics.lastJob || {}).updatedAt)"></p>
+                      <p class="text-xs text-rose-600" x-show="(metrics.lastJob || {}).error" x-text="(metrics.lastJob || {}).error"></p>
+                    </div>
+                    <template x-if="metrics.lastJob">
+                      <span class="pill" :class="{ 'bg-emerald-100 text-emerald-700': metrics.lastJob.status === 'sent', 'bg-amber-100 text-amber-700': metrics.lastJob.status === 'pending', 'bg-rose-100 text-rose-700': metrics.lastJob.status === 'failed' }" x-text="metrics.lastJob.status"></span>
+                    </template>
+                  </div>
+                </div>
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <button class="btn-primary px-5 py-2.5 font-semibold" @click="currentSection = 'compose'">
+                    <i class="ti ti-send mr-1"></i> Compose
+                  </button>
+                  <button class="btn-secondary px-5 py-2.5 text-sm font-semibold" @click="currentSection = 'jobs'">
+                    <i class="ti ti-mail mr-1"></i> Jobs
+                  </button>
+                  <button class="btn-secondary px-5 py-2.5 text-sm font-semibold" @click="showTopUp = true">
+                    <i class="ti ti-coins mr-1"></i> Top Up
+                  </button>
+                </div>
+              </article>
+            </template>
+            </section>
+
+            <!-- Section: Compose -->
+            <section x-show="currentSection === 'compose'" class="space-y-6">
+              <article class="surface p-5 md:p-6">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="text-xl font-bold text-[var(--ink)]">Compose Job</h2>
+                    <p class="text-xs text-[var(--muted)] mt-1">Signed in as <span class="font-semibold" x-text="user?.username"></span></p>
+                  </div>
+                  <span class="pill bg-teal-50 text-teal-700" x-show="busy">Working</span>
+                </div>
+
+                <form class="mt-5 space-y-4" @submit.prevent="createJob">
+                  <div class="surface-soft p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200" x-show="editingJobId">
+                    Editing <span class="font-semibold" x-text="editingJobSubject || 'job'"></span>.
+                    <button type="button" class="ml-2 text-xs underline" @click="cancelEdit">Cancel</button>
+                  </div>
+
+                  <div>
+                    <label class="text-sm font-medium">From Name</label>
+                    <input type="text" x-model.trim="form.fromName" @input.debounce.300ms="persistDraft" placeholder="Campaign Team" class="field mt-1" required />
+                  </div>
+
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label class="text-sm font-medium">Reply-To</label>
+                      <input type="email" x-model.trim="form.replyTo" @input.debounce.300ms="persistDraft" placeholder="reply@example.com" class="field mt-1" />
+                    </div>
+                    <div>
+                      <label class="text-sm font-medium">Subject</label>
+                      <input type="text" x-model.trim="form.subject" @input.debounce.300ms="persistDraft" class="field mt-1" required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="flex items-center justify-between text-sm">
+                      <label class="font-medium">Recipients</label>
+                      <span class="text-xs text-[var(--muted)]" x-text="`${recipientsCount} parsed`"></span>
+                    </div>
+                    <textarea rows="4" x-model="form.recipients" @input.debounce.300ms="persistDraft" placeholder="one@example.com, two@example.com" class="field mt-1" required></textarea>
+                    <p class="mt-1 text-xs text-[var(--muted)]">Commas, spaces, semicolons, or new lines.</p>
+                  </div>
+
+                  <div>
+                    <div class="flex items-center justify-between text-sm mb-2">
+                      <label class="font-medium">Email Body</label>
+                      <div class="flex gap-1">
+                        <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'visual' }" @click="setEditorMode('visual')">Visual</button>
+                        <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'html' }" @click="setEditorMode('html')">HTML</button>
+                        <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'text' }" @click="setEditorMode('text')">Text</button>
+                      </div>
+                    </div>
+                    <template x-if="editorMode === 'visual'">
+                      <div>
+                        <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
+                      </div>
+                    </template>
+                    <div x-show="editorMode === 'html'">
+                      <textarea rows="12" x-model="form.htmlBody" @input="onHtmlInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
+                    </div>
+                    <div x-show="editorMode === 'text'">
+                      <textarea rows="12" x-model="form.textBody" @input="onTextInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="Plain text content"></textarea>
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                      <button type="button" class="text-xs text-teal-700 underline" @click="insertStarterTemplate">Insert starter</button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="flex items-center justify-between text-sm mb-2">
+                      <label class="font-medium">Attachments</label>
+                      <span class="text-xs text-[var(--muted)]" x-text="attachments.length ? `${attachments.length} file(s)` : ''"></span>
+                    </div>
+                    <div class="upload-zone" @click="$refs.fileInput.click()" @dragover.prevent @drop.prevent="handleFileDrop">
+                      <template x-if="!uploadingFile">
+                        <div>
+                          <i class="ti ti-upload text-2xl text-[var(--muted)]"></i>
+                          <p class="text-sm text-[var(--muted)] mt-1">Click or drop files here (PDF, images, etc.)</p>
+                        </div>
+                      </template>
+                      <template x-if="uploadingFile">
+                        <div class="w-full">
+                          <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="text-[var(--muted)]">Uploading...</span>
+                            <span class="font-semibold text-[var(--accent)]" x-text="uploadProgress + '%'"></span>
+                          </div>
+                          <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-[var(--accent)] h-full rounded-full transition-all duration-200" :style="'width: ' + uploadProgress + '%'"></div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                    <input type="file" x-ref="fileInput" @change="handleFileSelect" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.zip,.csv" class="hidden" />
+                    <div class="mt-2 space-y-1" x-show="attachments.length">
+                      <template x-for="(att, idx) in attachments" :key="idx">
+                        <div class="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-sm border border-[var(--line)]">
+                          <div class="flex items-center gap-2 truncate">
+                            <i :class="att.contentType?.includes('pdf') ? 'ti ti-file-type-pdf text-red-500' : att.contentType?.includes('image') ? 'ti ti-photo text-blue-500' : 'ti ti-file text-gray-500'"></i>
+                            <span class="truncate" x-text="att.filename"></span>
+                          </div>
+                          <button type="button" @click="removeAttachment(idx)" class="text-rose-500 hover:text-rose-700 ml-2 flex-shrink-0">
+                            <i class="ti ti-x"></i>
+                          </button>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap gap-2 pt-2">
+                    <button type="submit" class="btn-primary px-5 py-2.5 font-semibold" :disabled="busy || recipientsBusy || !hasEnoughCredits">
+                      <span x-text="editingJobId ? 'Update Job' : 'Save Job'"></span>
+                    </button>
+                    <button type="button" class="btn-secondary px-4 py-2.5 text-sm" @click="clearDraft(true)">Clear Draft</button>
+                    <button type="button" class="btn-secondary px-4 py-2.5 text-sm" x-show="editingJobId" @click="cancelEdit">Cancel Edit</button>
+                  </div>
+
+                  <div class="flex items-center gap-3 text-xs text-[var(--muted)]" x-show="recipientsCount > 0 && creditsPerEmail > 0">
+                    <i class="ti ti-coins"></i>
+                    <span>Cost: <span class="font-semibold" x-text="recipientsCount * creditsPerEmail"></span> credits · You have <span class="font-semibold" x-text="userCredits"></span></span>
+                    <span x-show="recipientsCount * creditsPerEmail > userCredits" class="text-rose-600 font-semibold">(insufficient)</span>
+                  </div>
+
+                  <p class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" x-show="message" x-text="message"></p>
+                  <p class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-show="error" x-text="error"></p>
+                </form>
+              </article>
+            </section>
+
+            <div class="space-y-6 lg:col-span-7">
+              <article class="surface reveal p-6">
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Total</p>
+                    <p class="font-title text-xl font-semibold" x-text="jobStats.total"></p>
+                  </div>
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Pending</p>
+                    <p class="font-title text-xl font-semibold text-amber-700" x-text="jobStats.pending"></p>
+                  </div>
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Sent</p>
+                    <p class="font-title text-xl font-semibold text-emerald-700" x-text="jobStats.sent"></p>
+                  </div>
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
+                    <p class="font-title text-xl font-semibold text-rose-700" x-text="jobStats.failed"></p>
+              <article class="surface p-5 md:p-6 reveal">
+            <!-- Section: Jobs -->
+            <section x-show="currentSection === 'jobs'" class="space-y-6">
+              <article class="surface p-5 md:p-6">
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Total</p>
+                    <p class="text-xl font-bold text-[var(--ink)]" x-text="jobStats.total"></p>
+                  </div>
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Pending</p>
+                    <p class="text-xl font-bold text-amber-700" x-text="jobStats.pending"></p>
+                  </div>
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Sent</p>
+                    <p class="text-xl font-bold text-emerald-700" x-text="jobStats.sent"></p>
+                  </div>
+                  <div class="surface-soft p-3">
+                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
+                    <p class="text-xl font-bold text-rose-700" x-text="jobStats.failed"></p>
+                  </div>
+                </div>
+              </article>
+              <article class="surface p-5 md:p-6">
+                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 class="text-xl font-bold text-[var(--ink)]">Email Jobs</h2>
+                    <p class="text-sm text-[var(--muted)]">Search, filter, send, retry.</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="tab-btn" :class="{ 'active': activeTab === 'jobs' }" @click="setTab('jobs')">Jobs</button>
+                    <button class="tab-btn" :class="{ 'active': activeTab === 'activity' }" @click="setTab('activity')">Activity</button>
+                  </div>
+                </div>
+
+                <template x-if="activeTab === 'jobs'">
+                  <div class="mt-5 space-y-4">
+                    <div class="grid gap-3 sm:grid-cols-3">
+                      <input type="text" x-model.trim="jobSearch" class="field sm:col-span-2" placeholder="Search by subject, owner, recipients" />
+                      <select x-model="statusFilter" class="field">
+                        <option value="all">All statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="sending">Sending</option>
+                        <option value="sent">Sent</option>
+                        <option value="failed">Failed</option>
+                      </select>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs text-[var(--muted)]">
+                      <p x-text="`${filteredJobs.length} matching job(s)`"></p>
+                      <button class="text-teal-700 underline" @click="fetchJobs">Reload jobs</button>
+                    </div>
+
+                    <template x-if="!filteredJobs.length">
+                      <div class="surface-soft p-5 text-sm text-[var(--muted)]">
+                        No matching jobs. Try changing filters or create a new job from the composer.
+                      </div>
+                      <p x-text="`${filteredJobs.length} matching`"></p>
+                      <button class="text-teal-700 underline" @click="fetchJobs">Reload</button>
+                    </div>
+
+                    <template x-if="!filteredJobs.length">
+                      <div class="surface-soft p-5 text-sm text-[var(--muted)]">No matching jobs.</div>
+                    </template>
+
+                    <div class="space-y-3" x-show="filteredJobs.length">
+                      <template x-for="job in filteredJobs" :key="job.id">
+                        <div class="surface-soft p-4">
+                          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div class="space-y-1">
+                              <p class="font-semibold text-base" x-text="job.subject || 'Untitled job'"></p>
+                              <p class="text-xs text-[var(--muted)]">
+                                <span x-text="job.fromName || job.from || 'Admin default'"></span>
+                                <span>•</span>
+                                <span x-text="job.owner"></span>
+                                <span>•</span>
+                                <span x-text="formatDate(job.updatedAt)"></span>
+                              </p>
+                              <p class="text-xs text-[var(--muted)]" x-text="(job.recipientsPreview || job.recipients || []).join(', ')"></p>
+                              <p class="text-xs text-[var(--muted)]" x-text="job.recipientsCount ? `${job.recipientsCount} recipients` : ''"></p>
+                            </div>
+
+                            <div class="flex flex-col items-start gap-2 md:items-end">
+                              <span
+                                class="pill"
+                                :class="{
+                                  'bg-emerald-100 text-emerald-700 border-emerald-200': job.status === 'sent',
+                                  'bg-amber-100 text-amber-700 border-amber-200': job.status === 'pending',
+                                  'bg-rose-100 text-rose-700 border-rose-200': job.status === 'failed',
+                                  'bg-sky-100 text-sky-700 border-sky-200': job.status === 'sending'
+                                }"
+                                x-text="job.status"></span>
+                              <p class="text-xs text-[var(--muted)]" x-text="formatJobSummary(job)"></p>
+                            </div>
+                          </div>
+
+                          <p class="mt-2 text-xs text-rose-600" x-show="job.error" x-text="job.error"></p>
+
+                          <div class="mt-3 flex flex-wrap gap-2">
+                            <button class="btn-primary px-3 py-1.5 text-xs font-semibold disabled:opacity-50" @click="triggerSend(job.id)" :disabled="job.status === 'sending' || job.status === 'sent'">Send</button>
+                            <button class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs font-semibold disabled:opacity-50" x-show="job.status === 'failed' || job.status === 'sent'" :disabled="job.status === 'sending'" @click="retryJob(job)"><span x-text="job.status === 'sent' ? 'Resend' : 'Retry'"></span></button>
+                            <button class="btn-secondary px-3 py-1.5 text-xs font-semibold" @click="editJob(job)" :disabled="recipientsBusy || job.status === 'sending'">Edit</button>
+                            <button class="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-semibold" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <template x-if="activeTab === 'activity'">
+                  <div class="mt-5 space-y-3">
+                    <div class="text-sm text-[var(--muted)]" x-show="activityBusy">Loading activity...</div>
+                    <p class="text-sm text-rose-700" x-show="activityError" x-text="activityError"></p>
+                    <template x-if="!activityBusy && !activity.length && !activityError">
+                      <div class="surface-soft p-5 text-sm text-[var(--muted)]">No activity recorded yet.</div>
+                    </template>
+
+                    <div class="space-y-3" x-show="activity.length">
+                      <template x-for="entry in activity" :key="entry.id">
+                        <article class="surface-soft p-4 border-l-4" :class="entry.status === 'sent' ? 'border-l-emerald-400' : 'border-l-rose-400'">
+                          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p class="font-semibold" x-text="entry.subject || 'Untitled job'"></p>
+                            <p class="text-xs text-[var(--muted)]" x-text="formatDate(entry.timestamp || entry.updatedAt)"></p>
+                          </div>
+                          <span class="pill" :class="entry.status === 'sent' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'" x-text="entry.status"></span>
+                        </div>
+                        <p class="mt-2 text-sm text-[var(--muted)]" x-text="entry.message || ''"></p>
+                        <p class="mt-1 text-xs text-[var(--muted)]" x-text="`Sent ${entry.sent || 0}/${entry.recipientsCount || entry.sent + entry.failed || 0} · Failed ${entry.failed || 0}`"></p>
+                      </article>
+                    </template>
+                  </div>
+                </div>
+                </template>
+              </article>
+            </section>
+
+          </div>
+        </div>
+      </template>
+
+      <!-- Top Up Modal -->
+      <div x-show="showTopUp" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-start justify-center z-50 overflow-y-auto" @click.self="showTopUp = false">
+        <div class="surface p-6 md:p-8 w-full max-w-lg my-12 mx-4">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold text-[var(--ink)]">Top Up Credits</h2>
+            <button @click="showTopUp = false" class="text-[var(--muted)] hover:text-[var(--ink)]"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div class="surface-soft p-4 flex items-center justify-between">
+              <div>
+                <p class="text-sm text-[var(--muted)]">Your Balance</p>
+                <p class="text-2xl font-bold text-[var(--ink)]"><span x-text="userCredits"></span> credits</p>
+                <p class="text-xs text-[var(--muted)] mt-1" x-show="topUpSettings.tokenRate > 0">
+                  ≈ $<span x-text="(userCredits / topUpSettings.tokenRate).toFixed(2)"></span> USD
+                  (<span x-text="topUpSettings.tokenRate"></span> tokens per USD)
+                </p>
+              </div>
+              <i class="ti ti-coins text-3xl text-teal-500"></i>
+            </div>
+            <div class="surface-soft p-4">
+              <p class="text-sm font-semibold text-[var(--ink)] mb-2">Payment Details</p>
+              <p class="text-sm text-[var(--muted)] whitespace-pre-wrap" x-text="topUpSettings.paymentDetails || 'No payment details configured yet. Contact support.'"></p>
+            </div>
+            <div x-show="topUpSettings.telegramLink" class="surface-soft p-4 flex items-center gap-3">
+              <i class="ti ti-brand-telegram text-2xl text-sky-500"></i>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-[var(--ink)]">Need help?</p>
+                <p class="text-xs text-[var(--muted)]">Contact support on Telegram</p>
+              </div>
+              <a :href="topUpSettings.telegramLink" target="_blank" class="btn-primary px-4 py-2 text-sm font-semibold no-underline inline-block">
+                <i class="ti ti-send mr-1"></i> Message
+              </a>
+            </div>
+            <p class="text-xs text-[var(--muted)]">After making payment, contact support to have credits added to your account.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

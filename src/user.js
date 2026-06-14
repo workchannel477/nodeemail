@@ -257,7 +257,7 @@ document.addEventListener('alpine:init', () => {
     formatJobSummary(job) {
       const sent = job.sentCount ?? job.lastResult?.sent ?? 0;
       const failed = job.failedCount ?? job.lastResult?.failed ?? 0;
-      const total = job.recipientsCount ?? job.recipients?.length || 0;
+      const total = job.recipientsCount ?? (job.recipients?.length || 0);
       const parts = [`${sent}/${total || '?'} sent`];
       if (failed) parts.push(`${failed} failed`);
       if (job.status === 'sending') parts.push('sending...');
