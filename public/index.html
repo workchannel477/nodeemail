@@ -254,6 +254,8 @@
         letter-spacing: 0.02em;
       }
 
+      .editor-visible { display: block; }
+      .editor-hidden { display: none !important; }
       .reveal {
         animation: rise 0.5s ease both;
       }
@@ -497,13 +499,13 @@
                         <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'text' }" @click="setEditorMode('text')">Text</button>
                       </div>
                     </div>
-                    <div x-show="editorMode === 'visual'" x-cloak>
+                    <div :class="editorMode === 'visual' ? 'editor-visible' : 'editor-hidden'">
                       <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
                     </div>
-                    <div x-show="editorMode === 'html'" x-cloak>
+                    <div :class="editorMode === 'html' ? 'editor-visible' : 'editor-hidden'">
                       <textarea rows="12" x-model="form.htmlBody" @input="onHtmlInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
                     </div>
-                    <div x-show="editorMode === 'text'" x-cloak>
+                    <div :class="editorMode === 'text' ? 'editor-visible' : 'editor-hidden'">
                       <textarea rows="12" x-model="form.textBody" @input="onTextInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="Plain text content"></textarea>
                     </div>
                     <div class="flex gap-2 mt-2">
