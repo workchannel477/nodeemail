@@ -1521,16 +1521,26 @@ async function checkEmailRateLimit(username) {
   return true;
 }
 
-// ---------- tmpfiles.org Upload (free, no API key needed) ----------
+// ---------- File Upload (tmpfiles.org with local fallback) ----------
+const uploadsDir = path.join(staticDir, "uploads");
+
 async function uploadToTmpFiles(fileBuffer, fileName) {
   const formData = new FormData();
   const blob = new Blob([fileBuffer]);
   formData.append("file", blob, fileName);
   const response = await fetch("https://tmpfiles.org/api/v1/upload", { method: "POST", body: formData });
   const data = await response.json();
-  if (!data.success) throw new Error(data.message || "tmpfiles.org upload failed");
+  if (!data || !data.data || !data.data.url) throw new Error("tmpfiles.org: unexpected response");
   const dlUrl = data.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
   return { url: dlUrl, key: "", expiry: "30+ days" };
+}
+
+async function saveLocalFile(fileBuffer, fileName) {
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}-${safe}`;
+  await fs.mkdirp(uploadsDir);
+  await fs.writeFile(path.join(uploadsDir, unique), fileBuffer);
+  return { url: `/uploads/${unique}`, key: "", expiry: "permanent" };
 }
 
 // ---------- Resend Rate Limiting ----------
@@ -1543,12 +1553,7 @@ const resendRequestTimestamps = [];
 
 function normalizeResendRequestsPerSecond(value) {
   const parsed = parseInt(value, 10);
-<<<<<<< HEAD
-  if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  return RESEND_REQUESTS_PER_SECOND_DEFAULT;
-=======
   return Number.isFinite(parsed) && parsed > 0 ? parsed : RESEND_REQUESTS_PER_SECOND_DEFAULT;
->>>>>>> f8d4db3c (New updates.)
 }
 
 async function throttleResendRequest(maxRequestsPerSecond = RESEND_REQUESTS_PER_SECOND_DEFAULT) {
@@ -3296,22 +3301,27 @@ app.post("/admin/providers/:id/reset-usage", requireAuth, requireAdmin, async (r
   }
 });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 app.get("/healthz", async (_req, res) => {
   try {
     await ensureDataFiles();
     res.json({ status: "ok", timestamp: new Date().toISOString(), sessionCount: sessions.size });
-=======
-// ---------- File Upload (file.io) ----------
-=======
-// ---------- File Upload (tmpfiles.org) ----------
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+// ---------- File Upload ----------
 app.post("/api/upload", requireAuth, async (req, res) => {
   try {
     if (!req.files || !req.files.file) return res.status(400).json({ message: "No file uploaded" });
     const file = req.files.file;
-    const result = await uploadToTmpFiles(file.data, file.name);
+    let result;
+    try {
+      result = await uploadToTmpFiles(file.data, file.name);
+    } catch (cloudErr) {
+      console.warn("tmpfiles.org failed, saving locally:", cloudErr.message);
+      result = await saveLocalFile(file.data, file.name);
+    }
     res.json({ message: "File uploaded", url: result.url, filename: file.name, contentType: file.mimetype || "application/octet-stream", key: result.key });
   } catch (err) {
     res.status(500).json({ message: err.message || "Upload failed" });

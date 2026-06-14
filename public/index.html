@@ -829,9 +829,14 @@
                         </div>
                       </template>
                       <template x-if="uploadingFile">
-                        <div>
-                          <i class="ti ti-loader animate-spin text-2xl text-[var(--accent)]"></i>
-                          <p class="text-sm text-[var(--muted)] mt-1">Uploading via tmpfiles.org...</p>
+                        <div class="w-full">
+                          <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="text-[var(--muted)]">Uploading...</span>
+                            <span class="font-semibold text-[var(--accent)]" x-text="uploadProgress + '%'"></span>
+                          </div>
+                          <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-[var(--accent)] h-full rounded-full transition-all duration-200" :style="'width: ' + uploadProgress + '%'"></div>
+                          </div>
                         </div>
                       </template>
                     </div>

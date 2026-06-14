@@ -1228,6 +1228,7 @@ const dashboardAppDefinition = () => ({
     form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '' },
     attachments: [],
     uploadingFile: false,
+    uploadProgress: 0,
     editorMode: 'visual',
     userCredits: 0,
     creditsPerEmail: 1,
@@ -1535,19 +1536,40 @@ const dashboardAppDefinition = () => ({
       await this.uploadFiles(files);
     },
 
+    uploadFileWithProgress(file) {
+      return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', apiUrl('/api/upload'));
+        xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); } catch (e) { reject(new Error('Invalid response')); }
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.message || 'Upload failed'));
+            } catch (e) { reject(new Error('Upload failed')); }
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formData);
+      });
+    },
+
     async uploadFiles(files) {
       this.uploadingFile = true;
+      this.uploadProgress = 0;
       try {
         for (const file of files) {
-          const formData = new FormData();
-          formData.append('file', file);
-          const response = await apiFetch('/api/upload', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${this.token}` },
-            body: formData
-          });
-          if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Upload failed'); }
-          const data = await response.json();
+          this.uploadProgress = 0;
+          const data = await this.uploadFileWithProgress(file);
           this.attachments.push({ filename: data.filename, url: data.url, contentType: data.contentType });
           this.message = `${data.filename} uploaded`;
           setTimeout(() => this.message = '', 3000);
@@ -1558,6 +1580,7 @@ const dashboardAppDefinition = () => ({
         setTimeout(() => this.error = '', 4000);
       } finally {
         this.uploadingFile = false;
+        this.uploadProgress = 0;
       }
     },
 
