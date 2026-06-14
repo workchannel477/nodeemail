@@ -8,7 +8,6 @@
     <script src="./config.js"></script>
     <script defer src="./admin.js"></script>
     <script defer src="./alpinejs.min.js"></script>
-<<<<<<< HEAD
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,16 +18,11 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
     />
-=======
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-<<<<<<< HEAD
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.css">
     <script src="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.js"></script>
->>>>>>> f8d4db3c (New updates.)
-=======
     <link rel="stylesheet" href="https://unpkg.com/trix@2.0.8/dist/trix.css">
     <script src="https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js"></script>
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
     <style>
       :root {
         --bg: #f4f8f7;
@@ -40,8 +34,6 @@
         --accent-2: #e07a2d;
         --surface: rgba(255, 255, 255, 0.86);
       }
-
-<<<<<<< HEAD
       * {
         font-family: "Work Sans", sans-serif;
       }
@@ -92,7 +84,6 @@
         background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 22px;
-=======
       * { font-family: "Inter", "Work Sans", sans-serif; }
 
       body {
@@ -104,7 +95,6 @@
         background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 16px;
->>>>>>> f8d4db3c (New updates.)
         backdrop-filter: blur(14px);
         box-shadow: 0 18px 40px rgba(18, 32, 29, 0.08);
         width: 100%;
@@ -115,7 +105,6 @@
       .surface-soft {
         background: rgba(255, 255, 255, 0.72);
         border: 1px solid var(--line);
-<<<<<<< HEAD
         border-radius: 18px;
       }
 
@@ -129,7 +118,6 @@
       .btn-primary:hover {
         transform: translateY(-1px);
         box-shadow: 0 10px 24px rgba(15, 118, 110, 0.3);
-=======
         border-radius: 12px;
         width: 100%;
         max-width: 100%;
@@ -152,30 +140,18 @@
         background: #fff;
         border: 1px solid var(--line);
         color: var(--ink);
-<<<<<<< HEAD
         border-radius: 12px;
-=======
         border-radius: 10px;
->>>>>>> f8d4db3c (New updates.)
       }
 
       .field {
         width: 100%;
         border: 1px solid var(--line);
-<<<<<<< HEAD
         border-radius: 12px;
         background: rgba(255, 255, 255, 0.92);
         padding: 0.65rem 0.8rem;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
-
-=======
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.92);
-        padding: 0.6rem 0.8rem;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-      }
->>>>>>> f8d4db3c (New updates.)
       .field:focus {
         outline: none;
         border-color: rgba(15, 118, 110, 0.6);
@@ -185,18 +161,12 @@
       .pill {
         border-radius: 999px;
         border: 1px solid var(--line);
-<<<<<<< HEAD
         padding: 0.38rem 0.8rem;
-=======
         padding: 0.3rem 0.8rem;
->>>>>>> f8d4db3c (New updates.)
         font-size: 0.77rem;
         font-weight: 600;
         letter-spacing: 0.02em;
       }
-
-<<<<<<< HEAD
-<<<<<<< HEAD
       .reveal {
         animation: rise 0.5s ease both;
       }
@@ -255,16 +225,13 @@
                 <i class="ti ti-logout mr-1"></i> Logout
               </button>
             </div>
-=======
+<style>
       .reveal { animation: rise 0.4s ease both; }
 
       @keyframes rise {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
-
-=======
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
       trix-editor {
         min-height: 200px;
         border-radius: 10px;
@@ -414,9 +381,6 @@
                 <span x-text="item.label"></span>
               </button>
             </template>
-<<<<<<< HEAD
->>>>>>> f8d4db3c (New updates.)
-=======
           </nav>
           <div class="p-3 border-t border-white/10 space-y-1">
             <div class="flex items-center gap-2 px-3 py-2 text-sm text-white/80">
@@ -449,15 +413,12 @@
           <div class="flex items-center gap-2 text-white/70 text-sm">
             <i class="ti ti-coins"></i>
             <span class="font-semibold" x-text="userCredits"></span>
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
           </div>
         </header>
       </div>
 
-<<<<<<< HEAD
         <template x-if="!token">
           <section class="grid gap-6 lg:grid-cols-12">
-<<<<<<< HEAD
             <div class="surface reveal p-6 md:p-8 lg:col-span-7">
               <h2 class="font-title text-2xl font-semibold">Modernized composition flow</h2>
               <p class="mt-2 text-sm text-[var(--muted)]">
@@ -486,7 +447,6 @@
             <section class="surface reveal p-6 md:p-8 lg:col-span-5">
               <h2 class="font-title text-xl font-semibold">Sign in</h2>
               <p class="text-sm text-[var(--muted)] mt-1">Use your workspace account to continue.</p>
-=======
             <div class="surface p-6 md:p-8 lg:col-span-7 reveal">
               <h2 class="text-2xl font-bold text-[var(--ink)]">Modernized email composition</h2>
               <p class="mt-2 text-sm text-[var(--muted)]">Rich text editor, file attachments, and credit-based sending.</p>
@@ -507,7 +467,6 @@
                   <p class="text-sm font-semibold">Team Ready</p>
                   <p class="text-xs text-[var(--muted)] mt-1">Role-based access, activity timeline.</p>
                 </div>
-=======
       <!-- Login -->
       <template x-if="!token">
         <div class="flex items-center justify-center min-h-screen p-4">
@@ -515,16 +474,13 @@
             <div class="text-center mb-6">
               <div class="w-14 h-14 rounded-xl bg-teal-100 flex items-center justify-center mx-auto">
                 <i class="ti ti-mail-forward text-2xl text-teal-600"></i>
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
               </div>
               <h1 class="mt-3 text-2xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
               <p class="mt-1 text-sm text-[var(--muted)]">Sign in to your account</p>
             </div>
-<<<<<<< HEAD
             <section class="surface p-6 md:p-8 lg:col-span-5 reveal">
               <h2 class="text-xl font-bold text-[var(--ink)]">Sign in</h2>
               <p class="text-sm text-[var(--muted)] mt-1">Use your workspace account.</p>
->>>>>>> f8d4db3c (New updates.)
               <form class="mt-5 space-y-4" @submit.prevent="login">
                 <div>
                   <label class="text-sm font-medium">Username</label>
@@ -541,7 +497,6 @@
                 <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
               </form>
             </section>
-=======
             <form class="space-y-4" @submit.prevent="login">
               <div>
                 <label class="text-sm font-medium">Username</label>
@@ -557,23 +512,18 @@
               </button>
               <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
             </form>
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
           </section>
         </div>
       </template>
 
-<<<<<<< HEAD
         <template x-if="token">
           <section class="grid gap-6 lg:grid-cols-12">
             <div class="space-y-6 lg:col-span-5">
-<<<<<<< HEAD
               <article class="surface reveal p-6">
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="font-title text-xl font-semibold">Compose Job</h2>
-=======
               <article class="surface p-5 md:p-6 reveal">
-=======
       <!-- Authenticated content -->
       <template x-if="token">
         <div class="main-area">
@@ -664,33 +614,27 @@
             <!-- Section: Compose -->
             <section x-show="currentSection === 'compose'" class="space-y-6">
               <article class="surface p-5 md:p-6">
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="text-xl font-bold text-[var(--ink)]">Compose Job</h2>
->>>>>>> f8d4db3c (New updates.)
                     <p class="text-xs text-[var(--muted)] mt-1">Signed in as <span class="font-semibold" x-text="user?.username"></span></p>
                   </div>
                   <span class="pill bg-teal-50 text-teal-700" x-show="busy">Working</span>
                 </div>
 
                 <form class="mt-5 space-y-4" @submit.prevent="createJob">
-<<<<<<< HEAD
                   <div
                     class="surface-soft p-3 text-sm text-amber-800 bg-amber-50 border-amber-200"
                     x-show="editingJobId">
                     Editing <span class="font-semibold" x-text="editingJobSubject || 'job'"></span>. Saving updates this existing job.
                     <button type="button" class="ml-3 text-xs underline" @click="cancelEdit">Cancel</button>
-=======
                   <div class="surface-soft p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200" x-show="editingJobId">
                     Editing <span class="font-semibold" x-text="editingJobSubject || 'job'"></span>.
                     <button type="button" class="ml-2 text-xs underline" @click="cancelEdit">Cancel</button>
->>>>>>> f8d4db3c (New updates.)
                   </div>
 
                   <div>
                     <label class="text-sm font-medium">From Name</label>
-<<<<<<< HEAD
                     <input
                       type="text"
                       x-model.trim="form.fromName"
@@ -698,15 +642,12 @@
                       placeholder="Campaign Team"
                       class="field mt-1"
                       required />
-=======
-                    <input type="text" x-model.trim="form.fromName" @input.debounce.300ms="persistDraft" placeholder="Campaign Team" class="field mt-1" required />
->>>>>>> f8d4db3c (New updates.)
+                  <input type="text" x-model.trim="form.fromName" @input.debounce.300ms="persistDraft" placeholder="Campaign Team" class="field mt-1" required />
                   </div>
 
                   <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label class="text-sm font-medium">Reply-To</label>
-<<<<<<< HEAD
                       <input
                         type="email"
                         x-model.trim="form.replyTo"
@@ -722,13 +663,11 @@
                         @input.debounce.300ms="persistDraft"
                         class="field mt-1"
                         required />
-=======
                       <input type="email" x-model.trim="form.replyTo" @input.debounce.300ms="persistDraft" placeholder="reply@example.com" class="field mt-1" />
                     </div>
                     <div>
                       <label class="text-sm font-medium">Subject</label>
                       <input type="text" x-model.trim="form.subject" @input.debounce.300ms="persistDraft" class="field mt-1" required />
->>>>>>> f8d4db3c (New updates.)
                     </div>
                   </div>
 
@@ -737,7 +676,6 @@
                       <label class="font-medium">Recipients</label>
                       <span class="text-xs text-[var(--muted)]" x-text="`${recipientsCount} parsed`"></span>
                     </div>
-<<<<<<< HEAD
                     <textarea
                       rows="4"
                       x-model="form.recipients"
@@ -786,7 +724,6 @@
 
                   <p class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" x-show="message" x-text="message"></p>
                   <p class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-show="error" x-text="error"></p>
-=======
                     <textarea rows="4" x-model="form.recipients" @input.debounce.300ms="persistDraft" placeholder="one@example.com, two@example.com" class="field mt-1" required></textarea>
                     <p class="mt-1 text-xs text-[var(--muted)]">Commas, spaces, semicolons, or new lines.</p>
                   </div>
@@ -872,14 +809,11 @@
 
                   <p class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" x-show="message" x-text="message"></p>
                   <p class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-show="error" x-text="error"></p>
->>>>>>> f8d4db3c (New updates.)
                 </form>
               </article>
             </section>
 
-<<<<<<< HEAD
             <div class="space-y-6 lg:col-span-7">
-<<<<<<< HEAD
               <article class="surface reveal p-6">
                 <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div class="surface-soft p-3">
@@ -897,13 +831,10 @@
                   <div class="surface-soft p-3">
                     <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
                     <p class="font-title text-xl font-semibold text-rose-700" x-text="jobStats.failed"></p>
-=======
               <article class="surface p-5 md:p-6 reveal">
-=======
             <!-- Section: Jobs -->
             <section x-show="currentSection === 'jobs'" class="space-y-6">
               <article class="surface p-5 md:p-6">
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                 <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div class="surface-soft p-3">
                     <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Total</p>
@@ -920,13 +851,9 @@
                   <div class="surface-soft p-3">
                     <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
                     <p class="text-xl font-bold text-rose-700" x-text="jobStats.failed"></p>
->>>>>>> f8d4db3c (New updates.)
                   </div>
                 </div>
               </article>
-
-<<<<<<< HEAD
-<<<<<<< HEAD
               <article class="surface reveal p-6">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
@@ -942,11 +869,8 @@
                       class="pill"
                       :class="activeTab === 'activity' ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-[var(--ink)]'"
                       @click="setTab('activity')">Activity</button>
-=======
               <article class="surface p-5 md:p-6 reveal">
-=======
               <article class="surface p-5 md:p-6">
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h2 class="text-xl font-bold text-[var(--ink)]">Email Jobs</h2>
@@ -955,7 +879,6 @@
                   <div class="flex gap-2">
                     <button class="tab-btn" :class="{ 'active': activeTab === 'jobs' }" @click="setTab('jobs')">Jobs</button>
                     <button class="tab-btn" :class="{ 'active': activeTab === 'activity' }" @click="setTab('activity')">Activity</button>
->>>>>>> f8d4db3c (New updates.)
                   </div>
                 </div>
 
@@ -973,7 +896,6 @@
                     </div>
 
                     <div class="flex items-center justify-between text-xs text-[var(--muted)]">
-<<<<<<< HEAD
                       <p x-text="`${filteredJobs.length} matching job(s)`"></p>
                       <button class="text-teal-700 underline" @click="fetchJobs">Reload jobs</button>
                     </div>
@@ -982,23 +904,19 @@
                       <div class="surface-soft p-5 text-sm text-[var(--muted)]">
                         No matching jobs. Try changing filters or create a new job from the composer.
                       </div>
-=======
                       <p x-text="`${filteredJobs.length} matching`"></p>
                       <button class="text-teal-700 underline" @click="fetchJobs">Reload</button>
                     </div>
 
                     <template x-if="!filteredJobs.length">
                       <div class="surface-soft p-5 text-sm text-[var(--muted)]">No matching jobs.</div>
->>>>>>> f8d4db3c (New updates.)
                     </template>
 
                     <div class="space-y-3" x-show="filteredJobs.length">
                       <template x-for="job in filteredJobs" :key="job.id">
                         <div class="surface-soft p-4">
                           <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-<<<<<<< HEAD
                             <div class="space-y-1">
-<<<<<<< HEAD
                               <p class="font-semibold text-base" x-text="job.subject || 'Untitled job'"></p>
                               <p class="text-xs text-[var(--muted)]">
                                 <span x-text="job.fromName || job.from || 'Admin default'"></span>
@@ -1053,12 +971,9 @@
                               x-show="!isAdmin">
                               Delete
                             </button>
-=======
                               <p class="font-semibold text-base" x-text="job.subject || 'Untitled'"></p>
-=======
                             <div class="space-y-1 min-w-0">
                               <p class="font-semibold text-base break-words" x-text="job.subject || 'Untitled'"></p>
->>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                               <p class="text-xs text-[var(--muted)]">
                                 <span x-text="job.fromName || job.from || 'Default'"></span> &bull;
                                 <span x-text="job.owner"></span> &bull;
@@ -1079,7 +994,6 @@
                             <button class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs font-semibold disabled:opacity-50" x-show="job.status === 'failed' || job.status === 'sent'" :disabled="job.status === 'sending'" @click="retryJob(job)"><span x-text="job.status === 'sent' ? 'Resend' : 'Retry'"></span></button>
                             <button class="btn-secondary px-3 py-1.5 text-xs font-semibold" @click="editJob(job)" :disabled="recipientsBusy || job.status === 'sending'">Edit</button>
                             <button class="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-semibold" @click="deleteJob(job.id)" x-show="!isAdmin">Delete</button>
->>>>>>> f8d4db3c (New updates.)
                           </div>
                         </div>
                       </template>
@@ -1091,8 +1005,6 @@
                   <div class="mt-5 space-y-3">
                     <div class="text-sm text-[var(--muted)]" x-show="activityBusy">Loading activity...</div>
                     <p class="text-sm text-rose-700" x-show="activityError" x-text="activityError"></p>
-<<<<<<< HEAD
-
                     <template x-if="!activityBusy && !activity.length && !activityError">
                       <div class="surface-soft p-5 text-sm text-[var(--muted)]">No activity recorded yet.</div>
                     </template>
@@ -1103,7 +1015,6 @@
                           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p class="font-semibold" x-text="entry.subject || 'Untitled job'"></p>
-=======
                     <template x-if="!activityBusy && !activity.length && !activityError">
                       <div class="surface-soft p-5 text-sm text-[var(--muted)]">No activity recorded yet.</div>
                     </template>
@@ -1113,18 +1024,14 @@
                           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p class="font-semibold" x-text="entry.subject || 'Untitled'"></p>
->>>>>>> f8d4db3c (New updates.)
                               <p class="text-xs text-[var(--muted)]" x-text="formatDate(entry.timestamp)"></p>
                             </div>
                             <span class="pill" :class="entry.status === 'sent' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'" x-text="entry.status"></span>
                           </div>
-<<<<<<< HEAD
                           <p class="mt-2 text-sm text-[var(--muted)]" x-text="entry.message || 'No additional details'"></p>
                           <p class="mt-1 text-xs text-[var(--muted)]" x-text="`Sent ${entry.sent}/${entry.recipientsCount || entry.sent + entry.failed || 0} · Failed ${entry.failed}`"></p>
-=======
                           <p class="mt-2 text-sm text-[var(--muted)]" x-text="entry.message || ''"></p>
                           <p class="mt-1 text-xs text-[var(--muted)]" x-text="`Sent ${entry.sent || 0}/${entry.recipientsCount || entry.sent + entry.failed || 0} · Failed ${entry.failed || 0}`"></p>
->>>>>>> f8d4db3c (New updates.)
                         </article>
                       </template>
                     </div>
