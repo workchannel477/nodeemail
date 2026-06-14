@@ -573,25 +573,6 @@
               </article>
             </section>
 
-            <div class="space-y-6 lg:col-span-7">
-              <article class="surface reveal p-6">
-                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Total</p>
-                    <p class="font-title text-xl font-semibold" x-text="jobStats.total"></p>
-                  </div>
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Pending</p>
-                    <p class="font-title text-xl font-semibold text-amber-700" x-text="jobStats.pending"></p>
-                  </div>
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Sent</p>
-                    <p class="font-title text-xl font-semibold text-emerald-700" x-text="jobStats.sent"></p>
-                  </div>
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
-                    <p class="font-title text-xl font-semibold text-rose-700" x-text="jobStats.failed"></p>
-              <article class="surface p-5 md:p-6 reveal">
             <!-- Section: Jobs -->
             <section x-show="currentSection === 'jobs'" class="space-y-6">
               <article class="surface p-5 md:p-6">

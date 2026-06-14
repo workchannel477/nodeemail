@@ -1,5 +1,12 @@
 const apiUrl = (path) => (window.API ? window.API.url(path) : path);
-const apiFetch = (path, options) => fetch(apiUrl(path), options);
+const apiFetch = (path, options) => fetch(apiUrl(path), options).then((response) => {
+  if (response.status === 401 && options && options.headers && options.headers.Authorization) {
+    localStorage.removeItem('mailer_token');
+    localStorage.removeItem('mailer_user');
+    window.location.reload();
+  }
+  return response;
+});
 const valueOr = (value, fallback) => (value === undefined || value === null ? fallback : value);
 const readApiMessage = async (response, fallback = 'Request failed') => {
   try {
@@ -560,6 +567,11 @@ const dashboardAppDefinition = () => ({
         this.loadAttachmentsDraft();
         this.loadTopUpSettings();
       }
+      this.$nextTick(() => {
+        if (this.editorMode === 'visual') {
+          this.loadTrixContent(this.form.htmlBody);
+        }
+      });
     },
 
     headers() {
@@ -687,21 +699,13 @@ const dashboardAppDefinition = () => ({
         this.form.textBody = d.textContent || d.innerText || '';
       }
       this.editorMode = mode;
-      this.$nextTick(() => {
-        if (mode === 'visual') {
-          const editor = this.$refs.trix;
-          if (editor && editor.editor && this.form.htmlBody) {
-            editor.editor.loadHTML(this.form.htmlBody);
-          }
-        }
-      });
+      if (mode === 'visual') {
+        this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
+      }
     },
 
     onTrixInit() {
-      const editor = this.$refs.trix;
-      if (editor && editor.editor && this.form.htmlBody) {
-        editor.editor.loadHTML(this.form.htmlBody);
-      }
+      this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
     },
 
     onTrixChange() {
