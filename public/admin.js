@@ -499,6 +499,7 @@ const dashboardAppDefinition = () => ({
     attachments: [],
     uploadingFile: false,
     uploadProgress: 0,
+    quill: null,
     editorMode: 'visual',
     userCredits: 0,
     creditsPerEmail: 1,
@@ -567,11 +568,7 @@ const dashboardAppDefinition = () => ({
         this.loadAttachmentsDraft();
         this.loadTopUpSettings();
       }
-      this.$nextTick(() => {
-        if (this.editorMode === 'visual') {
-          this.loadTrixContent(this.form.htmlBody);
-        }
-      });
+      this.$nextTick(() => this.initQuillEditor());
     },
 
     headers() {
@@ -629,8 +626,7 @@ const dashboardAppDefinition = () => ({
         this.attachments = [];
         this.editingJobId = null;
         this.editingJobSubject = '';
-        const trix = this.$refs.trix;
-        if (trix && trix.editor) trix.editor.loadHTML('');
+        if (this.quill) this.quill.root.innerHTML = '';
         this.message = 'Draft cleared.';
         setTimeout(() => { this.message = ''; }, 2500);
       }
@@ -649,25 +645,42 @@ const dashboardAppDefinition = () => ({
       ].join('\n');
       this.form.textBody = 'Hello {{first_name}},\n\nThis is a quick update from our team.\n\nBest regards,\nYour Team';
       this.editorMode = 'visual';
+      this.$nextTick(() => { if (this.quill) this.quill.root.innerHTML = this.form.htmlBody; });
       this.persistDraft();
     },
 
-    loadTrixContent(html) {
-      const editor = this.$refs.trix;
-      if (editor && editor.editor) {
-        editor.editor.loadHTML(html || '');
-      } else {
-        setTimeout(() => this.loadTrixContent(html), 100);
+    initQuillEditor() {
+      const container = this.$refs.quill;
+      if (!container || this.quill) return;
+      try {
+        this.quill = new Quill(container, {
+          theme: 'snow',
+          modules: {
+            toolbar: [
+              ['bold', 'italic', 'underline', 'strike'],
+              [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+              ['link', 'image'],
+              ['clean']
+            ]
+          }
+        });
+        this.quill.on('text-change', () => {
+          this.form.htmlBody = this.quill.root.innerHTML;
+          this.form.textBody = this.quill.getText();
+          this.persistDraft();
+        });
+        if (this.form.htmlBody) {
+          this.quill.root.innerHTML = this.form.htmlBody;
+        }
+      } catch (e) {
+        console.warn('Quill init failed:', e);
       }
     },
 
     syncCurrentMode() {
-      if (this.editorMode === 'visual') {
-        const editor = this.$refs.trix;
-        if (editor && editor.editor && typeof editor.editor.getHTML === 'function') {
-          this.form.htmlBody = editor.editor.getHTML();
-          this.form.textBody = editor.editor.getDocument().toString();
-        }
+      if (this.editorMode === 'visual' && this.quill) {
+        this.form.htmlBody = this.quill.root.innerHTML;
+        this.form.textBody = this.quill.getText();
       }
     },
 
@@ -699,21 +712,8 @@ const dashboardAppDefinition = () => ({
         this.form.textBody = d.textContent || d.innerText || '';
       }
       this.editorMode = mode;
-      if (mode === 'visual') {
-        this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
-      }
-    },
-
-    onTrixInit() {
-      this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
-    },
-
-    onTrixChange() {
-      const editor = this.$refs.trix;
-      if (editor && editor.editor && typeof editor.editor.getHTML === 'function') {
-        this.form.htmlBody = editor.editor.getHTML();
-        this.form.textBody = editor.editor.getDocument().toString();
-        this.persistDraft();
+      if (mode === 'visual' && this.quill && this.form.htmlBody) {
+        this.quill.root.innerHTML = this.form.htmlBody;
       }
     },
 
@@ -888,7 +888,7 @@ const dashboardAppDefinition = () => ({
         this.editorMode = job.htmlBody && !job.textBody ? 'visual' : 'text';
         this.editingJobId = job.id;
         this.editingJobSubject = job.subject;
-        this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
+        this.$nextTick(() => { if (this.quill && this.form.htmlBody) this.quill.root.innerHTML = this.form.htmlBody; });
         this.persistDraft();
         this.saveAttachmentsDraft();
         window.scrollTo({ top: 0, behavior: 'smooth' });

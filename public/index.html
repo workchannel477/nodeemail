@@ -18,8 +18,8 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
     />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js"></script>
     <style>
       .reveal { animation: rise 0.4s ease both; }
 
@@ -27,24 +27,9 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      trix-editor {
-        min-height: 200px;
-        border-radius: 10px;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.92);
-      }
-      trix-editor:focus {
-        border-color: rgba(15, 118, 110, 0.6);
-        box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.13);
-      }
-      trix-toolbar .trix-button-group {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-      }
-      trix-toolbar .trix-button--icon {
-        width: 1.8em;
-        height: 1.8em;
-      }
+      #quill-editor { min-height: 230px; }
+      .ql-container { min-height: 180px; font-size: 0.95rem; }
+      .ql-editor { min-height: 180px; }
 
       .upload-zone {
         border: 2px dashed var(--line);
@@ -500,7 +485,7 @@
                       </div>
                     </div>
                     <div :class="editorMode === 'visual' ? 'editor-visible' : 'editor-hidden'">
-                      <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
+                      <div id="quill-editor" x-ref="quill"></div>
                     </div>
                     <div :class="editorMode === 'html' ? 'editor-visible' : 'editor-hidden'">
                       <textarea rows="12" x-model="form.htmlBody" @input="onHtmlInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
