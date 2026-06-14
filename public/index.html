@@ -497,15 +497,13 @@
                         <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'text' }" @click="setEditorMode('text')">Text</button>
                       </div>
                     </div>
-                    <template x-if="editorMode === 'visual'">
-                      <div>
-                        <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
-                      </div>
-                    </template>
-                    <div x-show="editorMode === 'html'">
+                    <div x-show="editorMode === 'visual'" x-cloak>
+                      <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
+                    </div>
+                    <div x-show="editorMode === 'html'" x-cloak>
                       <textarea rows="12" x-model="form.htmlBody" @input="onHtmlInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
                     </div>
-                    <div x-show="editorMode === 'text'">
+                    <div x-show="editorMode === 'text'" x-cloak>
                       <textarea rows="12" x-model="form.textBody" @input="onTextInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="Plain text content"></textarea>
                     </div>
                     <div class="flex gap-2 mt-2">
