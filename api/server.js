@@ -95,7 +95,7 @@ const DEFAULT_FROM_ADDRESS = envValue("DEFAULT_FROM", undefined, { secret: true 
 const DEFAULT_SMTP_HOST = envValue("DEFAULT_SMTP_HOST", "smtp.example.com");
 const DEFAULT_SMTP_PORT = parseInt(envValue("DEFAULT_SMTP_PORT", "587"), 10);
 const SESSION_TIMEOUT_SECONDS = parseInt(envValue("SESSION_TIMEOUT", "3600"), 10);
-const FILEIO_API_KEY = envValue("FILEIO_API_KEY", "");
+// (removed file.io; using tmpfiles.org for uploads)
 const DEFAULT_CREDITS = parseInt(envValue("DEFAULT_CREDITS", "100"), 10);
 const DEFAULT_COST_PER_EMAIL = parseInt(envValue("DEFAULT_COST_PER_EMAIL", "1"), 10);
 
@@ -120,6 +120,7 @@ if (firebaseProjectId && firebaseClientEmail && firebasePrivateKey) {
       }),
     });
     db = admin.firestore();
+    db.settings({ ignoreUndefinedProperties: true });
     console.log("Firebase Firestore initialized.");
   } catch (err) {
     console.warn("Firebase initialization failed (falling back to file storage):", err.message);
@@ -139,6 +140,7 @@ const rateLimitFilePath = path.join(dataDir, "rate-limit.json");
 const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
 const mailProvidersFilePath = path.join(dataDir, "mail-providers.json");
 const activityLogPath = path.join(dataDir, "activity-log.json");
+<<<<<<< HEAD
 <<<<<<< HEAD
 
 const app = express();
@@ -162,6 +164,9 @@ const SESSION_TIMEOUT_SECONDS = parseInt(envValue("SESSION_TIMEOUT", "3600"), 10
 const sessions = new Map();
 const apiRate = new Map();
 =======
+=======
+const appSettingsPath = path.join(dataDir, "app-settings.json");
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
 const recipientsDir = path.join(dataDir, "job-recipients");
 >>>>>>> f8d4db3c (New updates.)
 
@@ -327,6 +332,9 @@ const DATA_KEY_BUFFER = Buffer.from(DATA_OBFUSCATION_KEY || "nodeemail");
   if (!(await fs.pathExists(mailProvidersFilePath))) {
     await writeJsonFallback(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
   }
+  if (!(await fs.pathExists(appSettingsPath))) {
+    await writeJsonFallback(appSettingsPath, { paymentDetails: '', telegramLink: '' });
+  }
 }
 
 const DATA_KEY_BUFFER = Buffer.from(envValue("DATA_OBFUSCATION_KEY", "nodeemail") || "nodeemail");
@@ -476,7 +484,7 @@ async function loadAuthStore() {
   if (db) {
     const usersSnap = await db.collection("users").get();
     const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    return { users };
+    if (users.length) return { users };
   }
   return readJsonFallback(authFilePath, { users: [] });
 }
@@ -501,7 +509,6 @@ async function findUserByUsername(username) {
       const doc = snap.docs[0];
       return { id: doc.id, ...doc.data() };
     }
-    return null;
   }
   const payload = await readJsonFallback(authFilePath, { users: [] });
   return (payload.users || []).find((u) => u.username === username) || null;
@@ -510,7 +517,7 @@ async function findUserByUsername(username) {
 async function findUserById(id) {
   if (db) {
     const doc = await db.collection("users").doc(id).get();
-    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+    if (doc.exists) return { id: doc.id, ...doc.data() };
   }
   const payload = await readJsonFallback(authFilePath, { users: [] });
   return (payload.users || []).find((u) => u.id === id) || null;
@@ -737,22 +744,40 @@ async function writeRateLimits(data) {
   }
 }
 
+// ---------- App Settings ----------
+async function readAppSettings() {
+  if (db) {
+    const doc = await db.collection("config").doc("appSettings").get();
+    return doc.exists ? doc.data() : { paymentDetails: '', telegramLink: '' };
+  }
+  return readJsonFallback(appSettingsPath, { paymentDetails: '', telegramLink: '' });
+}
+
+async function saveAppSettings(data) {
+  if (db) {
+    await db.collection("config").doc("appSettings").set(data);
+  } else {
+    await writeJsonFallback(appSettingsPath, data);
+  }
+}
+
 // ---------- Credits ----------
 async function deductCredits(username, amount) {
   if (!amount || amount <= 0) return true;
   if (db) {
     const snap = await db.collection("users").where("username", "==", username).get();
-    if (snap.empty) return false;
-    const doc = snap.docs[0];
-    const user = doc.data();
-    const currentCredits = user.credits || 0;
-    if (currentCredits < amount) return false;
-    await doc.ref.update({
-      credits: admin.firestore.FieldValue.increment(-amount),
-      creditsUsed: (user.creditsUsed || 0) + amount,
-      updatedAt: new Date().toISOString(),
-    });
-    return true;
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      const user = doc.data();
+      const currentCredits = user.credits || 0;
+      if (currentCredits < amount) return false;
+      await doc.ref.update({
+        credits: admin.firestore.FieldValue.increment(-amount),
+        creditsUsed: (user.creditsUsed || 0) + amount,
+        updatedAt: new Date().toISOString(),
+      });
+      return true;
+    }
   }
   const payload = await readJsonFallback(authFilePath, { users: [] });
   const user = payload.users.find((u) => u.username === username);
@@ -769,13 +794,14 @@ async function deductCredits(username, amount) {
 async function getUserCredits(username) {
   if (db) {
     const snap = await db.collection("users").where("username", "==", username).get();
-    if (snap.empty) return { credits: 0, creditsUsed: 0, costPerEmail: DEFAULT_COST_PER_EMAIL };
-    const user = snap.docs[0].data();
-    return {
-      credits: user.credits || 0,
-      creditsUsed: user.creditsUsed || 0,
-      costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL,
-    };
+    if (!snap.empty) {
+      const user = snap.docs[0].data();
+      return {
+        credits: user.credits || 0,
+        creditsUsed: user.creditsUsed || 0,
+        costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL,
+      };
+    }
   }
   const payload = await readJsonFallback(authFilePath, { users: [] });
   const user = payload.users.find((u) => u.username === username);
@@ -790,8 +816,9 @@ async function getUserCredits(username) {
 async function getUserFeatures(username) {
   if (db) {
     const snap = await db.collection("users").where("username", "==", username).get();
-    if (snap.empty) return { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 };
-    return snap.docs[0].data().features || { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 };
+    if (!snap.empty) {
+      return snap.docs[0].data().features || { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 };
+    }
   }
   const payload = await readJsonFallback(authFilePath, { users: [] });
   const user = payload.users.find((u) => u.username === username);
@@ -1494,17 +1521,16 @@ async function checkEmailRateLimit(username) {
   return true;
 }
 
-// ---------- file.io Upload ----------
-async function uploadToFileIo(fileBuffer, fileName) {
+// ---------- tmpfiles.org Upload (free, no API key needed) ----------
+async function uploadToTmpFiles(fileBuffer, fileName) {
   const formData = new FormData();
   const blob = new Blob([fileBuffer]);
   formData.append("file", blob, fileName);
-  const headers = {};
-  if (FILEIO_API_KEY) headers["Authorization"] = `Bearer ${FILEIO_API_KEY}`;
-  const response = await fetch("https://file.io", { method: "POST", headers, body: formData });
+  const response = await fetch("https://tmpfiles.org/api/v1/upload", { method: "POST", body: formData });
   const data = await response.json();
-  if (!data.success) throw new Error(data.message || "file.io upload failed");
-  return { url: data.link, key: data.key, expiry: data.expiry || "14 days" };
+  if (!data.success) throw new Error(data.message || "tmpfiles.org upload failed");
+  const dlUrl = data.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
+  return { url: dlUrl, key: "", expiry: "30+ days" };
 }
 
 // ---------- Resend Rate Limiting ----------
@@ -2526,6 +2552,22 @@ app.post("/admin/rate-limits/reset", requireAuth, requireAdmin, async (req, res)
   res.json({ message: "Rate limits reset successfully" });
 });
 
+app.get("/admin/settings", requireAuth, requireAdmin, async (_req, res) => {
+  const settings = await readAppSettings();
+  res.json(settings);
+});
+
+app.post("/admin/settings", requireAuth, requireAdmin, async (req, res) => {
+  const { paymentDetails, telegramLink, tokenRate } = req.body || {};
+  const settings = await readAppSettings();
+  if (paymentDetails !== undefined) settings.paymentDetails = String(paymentDetails);
+  if (telegramLink !== undefined) settings.telegramLink = String(telegramLink);
+  if (tokenRate !== undefined) settings.tokenRate = Number(tokenRate) || 10;
+  settings.updatedAt = new Date().toISOString();
+  await saveAppSettings(settings);
+  res.json({ message: "Settings saved", settings });
+});
+
 app.post("/admin/data-sync", requireAuth, requireAdmin, async (req, res) => {
   const { message = "", push = true } = req.body || {};
   try {
@@ -2545,10 +2587,83 @@ app.post("/admin/data-sync", requireAuth, requireAdmin, async (req, res) => {
 });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // ---------- Jobs ----------
 app.get("/api/jobs", requireAuth, async (req, res) => {
   const { jobs = [] } = await readJson(jobsFilePath, { jobs: [] });
 =======
+=======
+app.post("/admin/sync-to-firebase", requireAuth, requireAdmin, async (req, res) => {
+  if (!db) return res.status(400).json({ message: "Firebase is not configured or not connected. Set FIREBASE_* env vars." });
+  try {
+    const results = { users: 0, jobs: 0, recipients: 0, smtpPool: false, ipRotation: false, rateLimits: false, mailProviders: false, activity: 0, errors: [] };
+
+    // Sync users
+    const authData = await readJsonFallback(authFilePath, { users: [] });
+    const users = authData.users || [];
+    for (const user of users) {
+      const id = user.id || uuid();
+      await db.collection("users").doc(id).set(user, { merge: true });
+      results.users++;
+    }
+
+    // Sync jobs
+    const jobsData = await readJsonFallback(jobsFilePath, { jobs: [] });
+    const jobs = jobsData.jobs || [];
+    for (const job of jobs) {
+      const id = job.id || uuid();
+      job.id = id;
+      await db.collection("jobs").doc(id).set(job, { merge: true });
+      results.jobs++;
+    }
+
+    // Sync job recipients
+    const recipientFiles = await fs.readdir(recipientsDir).catch(() => []);
+    for (const file of recipientFiles) {
+      if (!file.endsWith(".json")) continue;
+      const jobId = file.replace(".json", "");
+      const data = await readJsonFallback(path.join(recipientsDir, file), { recipients: [] });
+      if (Array.isArray(data.recipients) && data.recipients.length) {
+        await db.collection("jobRecipients").doc(jobId).set(data);
+        results.recipients += data.recipients.length;
+      }
+    }
+
+    // Sync smtp pool
+    const smtpData = await readJsonFallback(smtpPoolFilePath, { servers: [], currentIndex: 0, sentSinceRotation: 0, rotateAfter: SMTP_ROTATE_AFTER_DEFAULT });
+    await db.collection("config").doc("smtpPool").set(smtpData);
+    results.smtpPool = true;
+
+    // Sync mail providers
+    const providerData = await readJsonFallback(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
+    await db.collection("config").doc("mailProviders").set(providerData);
+    results.mailProviders = true;
+
+    // Sync ip rotation
+    const ipData = await readJsonFallback(ipRotationFilePath, { proxies: [], currentIndex: 0 });
+    await db.collection("config").doc("ipRotation").set(ipData);
+    results.ipRotation = true;
+
+    // Sync rate limits
+    const rateData = await readJsonFallback(rateLimitFilePath, { limits: {} });
+    await db.collection("config").doc("rateLimits").set(rateData);
+    results.rateLimits = true;
+
+    // Sync activity log
+    const activityData = await readJsonFallback(activityLogPath, { entries: [] });
+    const entries = activityData.entries || [];
+    for (const entry of entries) {
+      await db.collection("activity").add(entry);
+      results.activity++;
+    }
+
+    res.json({ message: "Sync to Firebase complete", results });
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Sync failed" });
+  }
+});
+
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
 function runGitCommand(command, logs, { allowFailure = false } = {}) {
   const entry = { command };
   try {
@@ -3182,21 +3297,35 @@ app.post("/admin/providers/:id/reset-usage", requireAuth, requireAdmin, async (r
 });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 app.get("/healthz", async (_req, res) => {
   try {
     await ensureDataFiles();
     res.json({ status: "ok", timestamp: new Date().toISOString(), sessionCount: sessions.size });
 =======
 // ---------- File Upload (file.io) ----------
+=======
+// ---------- File Upload (tmpfiles.org) ----------
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
 app.post("/api/upload", requireAuth, async (req, res) => {
   try {
     if (!req.files || !req.files.file) return res.status(400).json({ message: "No file uploaded" });
     const file = req.files.file;
-    const result = await uploadToFileIo(file.data, file.name);
+    const result = await uploadToTmpFiles(file.data, file.name);
     res.json({ message: "File uploaded", url: result.url, filename: file.name, contentType: file.mimetype || "application/octet-stream", key: result.key });
   } catch (err) {
     res.status(500).json({ message: err.message || "Upload failed" });
   }
+});
+
+// ---------- User Settings (payment info, telegram) ----------
+app.get("/api/settings", requireAuth, async (_req, res) => {
+  const settings = await readAppSettings();
+  res.json({
+    paymentDetails: settings.paymentDetails || '',
+    telegramLink: settings.telegramLink || '',
+    tokenRate: settings.tokenRate || 10,
+  });
 });
 
 // ---------- Health ----------

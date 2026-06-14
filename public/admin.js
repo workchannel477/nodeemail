@@ -142,6 +142,29 @@ const adminAppDefinition = () => ({
     featuresModalVisible: false,
     featuresForm: { userId: '', username: '', features: { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 } },
     activeTab: 'all',
+    syncBusy: false,
+    syncLog: [],
+    paymentSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10 },
+    paymentSettingsBusy: false,
+    currentSection: 'dashboard',
+    mobileNavOpen: false,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', icon: 'ti-dashboard' },
+      { id: 'users', label: 'Users', icon: 'ti-users' },
+      { id: 'credits', label: 'Credits', icon: 'ti-coins' },
+      { id: 'ip', label: 'IP Rotation', icon: 'ti-rotate-clockwise' },
+      { id: 'smtp', label: 'SMTP', icon: 'ti-mail-cog' },
+      { id: 'providers', label: 'Providers', icon: 'ti-mail-forward' },
+      { id: 'ratelimits', label: 'Rate Limits', icon: 'ti-speedometer' },
+      { id: 'jobs', label: 'Jobs', icon: 'ti-mail' },
+      { id: 'datasync', label: 'Data Sync', icon: 'ti-database' },
+      { id: 'payment', label: 'Payment', icon: 'ti-credit-card' },
+    ],
+
+    get currentSectionLabel() {
+      const found = this.navItems.find(i => i.id === this.currentSection);
+      return found ? found.label : '';
+    },
 
     get filteredJobs() {
       if (this.activeTab === 'all') return this.overview.jobs;
@@ -279,6 +302,7 @@ const adminAppDefinition = () => ({
       ];
 =======
         await this.loadCreditData();
+        await this.loadPaymentSettings();
       }
     },
 
@@ -307,6 +331,7 @@ const adminAppDefinition = () => ({
         await this.loadSmtpPool();
         await this.loadMailProviders();
         await this.loadCreditData();
+        await this.loadPaymentSettings();
         this.message = 'Login successful!';
         setTimeout(() => this.message = '', 3000);
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
@@ -1033,6 +1058,69 @@ const adminAppDefinition = () => ({
       try { const response = await apiFetch(`/admin/jobs/${jobId}/recipients`, { method: 'DELETE', headers: this.headers() }); if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Failed to clear'); } const data = await response.json(); this.message = data.message; setTimeout(() => (this.message = ''), 3000); await this.fetchOverview(); } catch (error) { this.error = error.message; }
     },
 
+    async loadPaymentSettings() {
+      try {
+        const response = await apiFetch('/admin/settings', { headers: this.headers() });
+        if (response.ok) {
+          const data = await response.json();
+          this.paymentSettings = {
+            paymentDetails: data.paymentDetails || '',
+            telegramLink: data.telegramLink || '',
+            tokenRate: data.tokenRate || 10,
+          };
+        }
+      } catch (error) { console.error('Failed to load payment settings:', error); }
+    },
+
+    async savePaymentSettings() {
+      this.paymentSettingsBusy = true;
+      this.error = '';
+      try {
+        const response = await apiFetch('/admin/settings', {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify(this.paymentSettings),
+        });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Failed to save'); }
+        const data = await response.json();
+        this.message = data.message || 'Settings saved';
+        setTimeout(() => this.message = '', 3000);
+        await this.loadPaymentSettings();
+      } catch (error) { this.error = error.message; } finally { this.paymentSettingsBusy = false; }
+    },
+
+    async syncToFirebase() {
+      this.syncBusy = true;
+      this.syncLog = [];
+      this.syncLog.push("Starting sync to Firebase...");
+      try {
+        const response = await apiFetch('/admin/sync-to-firebase', { method: 'POST', headers: this.headers() });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Sync failed');
+        const r = data.results || {};
+        this.syncLog.push('Sync complete!');
+        this.syncLog.push(`  Users: ${r.users}`);
+        this.syncLog.push(`  Jobs: ${r.jobs}`);
+        this.syncLog.push(`  Recipients: ${r.recipients}`);
+        this.syncLog.push(`  SMTP Pool: ${r.smtpPool ? 'yes' : 'no'}`);
+        this.syncLog.push(`  Mail Providers: ${r.mailProviders ? 'yes' : 'no'}`);
+        this.syncLog.push(`  IP Rotation: ${r.ipRotation ? 'yes' : 'no'}`);
+        this.syncLog.push(`  Rate Limits: ${r.rateLimits ? 'yes' : 'no'}`);
+        this.syncLog.push(`  Activity entries: ${r.activity}`);
+        if (r.errors?.length) {
+          this.syncLog.push(`  Errors: ${r.errors.length}`);
+          r.errors.forEach(e => this.syncLog.push(`    - ${e}`));
+        }
+        this.message = data.message || 'Sync completed';
+        setTimeout(() => this.message = '', 4000);
+      } catch (error) {
+        this.syncLog.push(`ERROR: ${error.message}`);
+        this.error = error.message;
+      } finally {
+        this.syncBusy = false;
+      }
+    },
+
     formatDate(value) {
       if (!value) return '-';
       try { return new Date(value).toLocaleString(); } catch (error) { return value; }
@@ -1141,9 +1229,22 @@ const dashboardAppDefinition = () => ({
     attachments: [],
     uploadingFile: false,
     editorMode: 'visual',
-    trixInitialized: false,
     userCredits: 0,
     creditsPerEmail: 1,
+    showTopUp: false,
+    topUpSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10 },
+    currentSection: 'dashboard',
+    mobileNavOpen: false,
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', icon: 'ti-dashboard' },
+      { id: 'compose', label: 'Compose', icon: 'ti-send' },
+      { id: 'jobs', label: 'Jobs', icon: 'ti-mail' },
+    ],
+
+    get currentSectionLabel() {
+      const found = this.navItems.find(i => i.id === this.currentSection);
+      return found ? found.label : '';
+    },
 
     get isAdmin() { return this.user && this.user.role === 'admin'; },
     get hasEnoughCredits() {
@@ -1153,7 +1254,22 @@ const dashboardAppDefinition = () => ({
 
     get recipientsCount() { return this.estimateRecipients(this.form.recipients).length; },
 
+<<<<<<< HEAD
 >>>>>>> f8d4db3c (New updates.)
+=======
+    get metrics() {
+      const jobs = this.jobs || [];
+      let sent = 0, failed = 0, totalRecipients = 0, lastJob = null;
+      for (const j of jobs) {
+        sent += j.sentCount || 0;
+        failed += j.failedCount || 0;
+        totalRecipients += j.recipientsCount || 0;
+        if (!lastJob || (j.updatedAt && j.updatedAt > lastJob.updatedAt)) lastJob = j;
+      }
+      return { sent, failed, totalRecipients, lastJob };
+    },
+
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
     get filteredJobs() {
       const term = String(this.jobSearch || '').trim().toLowerCase();
       return (this.jobs || []).filter((job) => {
@@ -1215,6 +1331,7 @@ const dashboardAppDefinition = () => ({
     },
 =======
         this.loadAttachmentsDraft();
+        this.loadTopUpSettings();
       }
     },
 
@@ -1320,6 +1437,8 @@ const dashboardAppDefinition = () => ({
         this.attachments = [];
         this.editingJobId = null;
         this.editingJobSubject = '';
+        const trix = this.$refs.trix;
+        if (trix && trix.editor) trix.editor.loadHTML('');
         this.message = 'Draft cleared.';
         setTimeout(() => { this.message = ''; }, 2500);
       }
@@ -1347,30 +1466,58 @@ const dashboardAppDefinition = () => ({
         '  <p style="margin: 0;">Best regards,<br>Your Team</p>',
         '</div>'
       ].join('\n');
-      this.editorMode = 'html';
+      this.editorMode = 'visual';
+      this.persistDraft();
+    },
+
+    loadTrixContent(html) {
+      const editor = this.$refs.trix;
+      if (editor && editor.editor) {
+        editor.editor.loadHTML(html || '');
+      } else {
+        setTimeout(() => this.loadTrixContent(html), 100);
+      }
+    },
+
+    onHtmlInput() {
+      const d = document.createElement('div');
+      d.innerHTML = this.form.htmlBody || '';
+      this.form.textBody = d.textContent || d.innerText || '';
+      this.persistDraft();
+    },
+
+    onTextInput() {
+      this.form.htmlBody = '<p>' + (this.form.textBody || '').replace(/\n/g, '<br>') + '</p>';
       this.persistDraft();
     },
 
     setEditorMode(mode) {
+      if (mode === 'visual' && !this.form.htmlBody && this.form.textBody) {
+        this.form.htmlBody = '<p>' + this.form.textBody.replace(/\n/g, '<br>') + '</p>';
+      }
+      if (mode === 'html' && !this.form.htmlBody && this.form.textBody) {
+        this.form.htmlBody = '<p>' + this.form.textBody.replace(/\n/g, '<br>') + '</p>';
+      }
+      if (mode === 'text' && !this.form.textBody && this.form.htmlBody) {
+        const d = document.createElement('div');
+        d.innerHTML = this.form.htmlBody;
+        this.form.textBody = d.textContent || d.innerText || '';
+      }
       this.editorMode = mode;
     },
 
     onTrixInit() {
-      this.trixInitialized = true;
-      if (this.form.htmlBody) {
-        const editor = this.$refs.trix;
-        if (editor && editor.editor) {
-          editor.editor.loadHTML(this.form.htmlBody);
-        }
+      const editor = this.$refs.trix;
+      if (editor && editor.editor && this.form.htmlBody) {
+        editor.editor.loadHTML(this.form.htmlBody);
       }
     },
 
     onTrixChange() {
       const editor = this.$refs.trix;
-      if (editor && editor.editor) {
-        this.form.htmlBody = editor.editor.getDocument().toString();
-        // Use innerHTML for proper HTML
+      if (editor && editor.editor && typeof editor.editor.getHTML === 'function') {
         this.form.htmlBody = editor.editor.getHTML();
+        this.form.textBody = editor.editor.getDocument().toString();
         this.persistDraft();
       }
     },
@@ -1402,7 +1549,7 @@ const dashboardAppDefinition = () => ({
           if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Upload failed'); }
           const data = await response.json();
           this.attachments.push({ filename: data.filename, url: data.url, contentType: data.contentType });
-          this.message = `${data.filename} uploaded via file.io`;
+          this.message = `${data.filename} uploaded`;
           setTimeout(() => this.message = '', 3000);
         }
         this.saveAttachmentsDraft();
@@ -1479,6 +1626,7 @@ const dashboardAppDefinition = () => ({
 =======
         this.loadAttachmentsDraft();
         await this.loadActivity(true);
+        this.loadTopUpSettings();
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
     },
 
@@ -1533,7 +1681,25 @@ const dashboardAppDefinition = () => ({
       } catch (error) { this.error = error.message; }
     },
 
+<<<<<<< HEAD
 >>>>>>> f8d4db3c (New updates.)
+=======
+    async loadTopUpSettings() {
+      if (!this.token) return;
+      try {
+        const response = await apiFetch('/api/settings', { headers: this.headers() });
+        if (response.ok) {
+          const data = await response.json();
+          this.topUpSettings = {
+            paymentDetails: data.paymentDetails || '',
+            telegramLink: data.telegramLink || '',
+            tokenRate: data.tokenRate || 10,
+          };
+        }
+      } catch (error) { console.error('Failed to load top-up settings:', error); }
+    },
+
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
     async fetchJobs() {
       if (!this.token) return;
       this.error = '';
@@ -1619,6 +1785,7 @@ const dashboardAppDefinition = () => ({
         this.editorMode = job.htmlBody && !job.textBody ? 'visual' : 'text';
         this.editingJobId = job.id;
         this.editingJobSubject = job.subject;
+        this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
         this.persistDraft();
         this.saveAttachmentsDraft();
         window.scrollTo({ top: 0, behavior: 'smooth' });

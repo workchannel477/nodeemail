@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <title>NodeEmail Workspace</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./config.js"></script>
@@ -21,9 +21,14 @@
     />
 =======
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<<<<<<< HEAD
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.css">
     <script src="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.js"></script>
 >>>>>>> f8d4db3c (New updates.)
+=======
+    <link rel="stylesheet" href="https://unpkg.com/trix@2.0.8/dist/trix.css">
+    <script src="https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js"></script>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
     <style>
       :root {
         --bg: #f4f8f7;
@@ -102,6 +107,9 @@
 >>>>>>> f8d4db3c (New updates.)
         backdrop-filter: blur(14px);
         box-shadow: 0 18px 40px rgba(18, 32, 29, 0.08);
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
       }
 
       .surface-soft {
@@ -123,6 +131,9 @@
         box-shadow: 0 10px 24px rgba(15, 118, 110, 0.3);
 =======
         border-radius: 12px;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
       }
 
       .btn-primary {
@@ -184,6 +195,7 @@
         letter-spacing: 0.02em;
       }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
       .reveal {
         animation: rise 0.5s ease both;
@@ -251,6 +263,8 @@
         to { opacity: 1; transform: translateY(0); }
       }
 
+=======
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
       trix-editor {
         min-height: 200px;
         border-radius: 10px;
@@ -301,41 +315,146 @@
       }
 
       [x-cloak] { display: none !important; }
+
+      /* Sidebar */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 230px;
+        background: #0d3d39;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.25s ease;
+      }
+      .sidebar .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.6rem 0.9rem;
+        margin: 0 0.5rem;
+        color: rgba(255,255,255,0.7);
+        border-radius: 0.5rem;
+        transition: background 0.15s, color 0.15s;
+        cursor: pointer;
+        font-size: 0.9rem;
+        border: none;
+        background: none;
+        width: auto;
+        text-align: left;
+      }
+      .sidebar .nav-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+      .sidebar .nav-item.active { background: rgba(255,255,255,0.15); color: #fff; font-weight: 600; }
+      .sidebar .nav-item i { font-size: 1.15rem; flex-shrink: 0; }
+
+      .main-area {
+        margin-left: 230px;
+        min-height: 100vh;
+      }
+
+      .mobile-header {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 54px;
+        background: #0d3d39;
+        z-index: 45;
+        align-items: center;
+        padding: 0 1rem;
+        gap: 0.75rem;
+      }
+      .mobile-header button {
+        background: none;
+        border: none;
+        color: rgba(255,255,255,0.85);
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.25rem;
+        line-height: 1;
+      }
+      .mobile-header .title { color: #fff; font-size: 1rem; font-weight: 600; flex: 1; }
+
+      .mobile-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 35;
+      }
+
+      @media (max-width: 1023px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main-area { margin-left: 0; padding-top: 54px; }
+        .mobile-header { display: flex; }
+      }
     </style>
   </head>
   <body>
-    <main class="relative z-10 px-4 py-6 lg:py-10" x-data="dashboardApp()" x-init="init()" x-cloak>
-      <div class="mx-auto max-w-[1200px] space-y-6">
-        <header class="surface p-5 md:p-7 reveal">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div x-data="dashboardApp()" x-init="init()" x-cloak>
+      <div x-show="token" x-cloak>
+        <!-- Sidebar -->
+        <aside class="sidebar" :class="{ 'open': mobileNavOpen }">
+          <div class="p-4 border-b border-white/10 flex items-start justify-between gap-2">
             <div>
-              <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">NodeEmail</p>
-              <h1 class="mt-1 text-2xl md:text-3xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
-              <p class="mt-1 max-w-2xl text-sm text-[var(--muted)]">Build campaigns, attach files, and monitor sends.</p>
+              <p class="text-white font-bold text-base flex items-center gap-2">
+                <i class="ti ti-mail-forward text-teal-300"></i> NodeEmail
+              </p>
+              <p class="text-white/50 text-xs mt-0.5">Signed in as <span x-text="user?.username"></span></p>
             </div>
-            <template x-if="token">
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-50 border border-teal-200 text-sm">
-                  <i class="ti ti-coins text-teal-600"></i>
-                  <span class="font-semibold text-teal-700" x-text="`${userCredits}`"></span>
-                  <span class="text-teal-500">credits</span>
-                </div>
-                <span class="text-xs text-[var(--muted)]" x-show="creditsPerEmail > 0">@ <span x-text="creditsPerEmail"></span>/email</span>
-                <button class="btn-secondary px-3 py-1.5 text-sm" @click="fetchJobs;refreshProfile" :disabled="busy">
-                  <i class="ti ti-refresh mr-1"></i> Refresh
-                </button>
-                <button class="btn-secondary px-3 py-1.5 text-sm" x-show="isAdmin" @click="openAdmin">
-                  <i class="ti ti-shield-lock mr-1"></i> Admin
-                </button>
-                <button class="px-3 py-1.5 text-sm rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200" @click="logout">
-                  <i class="ti ti-logout mr-1"></i> Logout
-                </button>
-              </div>
+            <button @click="mobileNavOpen = false" class="lg:hidden text-white/50 hover:text-white p-1 shrink-0" aria-label="Close menu">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <nav class="flex-1 overflow-y-auto py-3 space-y-0.5">
+            <template x-for="item in navItems" :key="item.id">
+              <button class="nav-item" :class="{ 'active': currentSection === item.id }" @click="currentSection = item.id; mobileNavOpen = false">
+                <i :class="'ti ' + item.icon"></i>
+                <span x-text="item.label"></span>
+              </button>
             </template>
+<<<<<<< HEAD
 >>>>>>> f8d4db3c (New updates.)
+=======
+          </nav>
+          <div class="p-3 border-t border-white/10 space-y-1">
+            <div class="flex items-center gap-2 px-3 py-2 text-sm text-white/80">
+              <i class="ti ti-coins text-teal-300"></i>
+              <span class="font-semibold" x-text="userCredits"></span>
+              <span class="text-white/50">credits</span>
+              <span class="text-white/40 text-xs" x-show="creditsPerEmail > 0">@ <span x-text="creditsPerEmail"></span>/ea</span>
+            </div>
+            <button class="nav-item" @click="showTopUp = true; mobileNavOpen = false">
+              <i class="ti ti-coins"></i><span>Top Up</span>
+            </button>
+            <button class="nav-item" x-show="isAdmin" @click="openAdmin">
+              <i class="ti ti-shield-lock"></i><span>Admin Panel</span>
+            </button>
+            <button class="nav-item" @click="logout">
+              <i class="ti ti-logout"></i><span>Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Mobile overlay -->
+        <div x-show="mobileNavOpen" class="mobile-overlay" @click="mobileNavOpen = false"></div>
+
+        <!-- Mobile header -->
+        <header class="mobile-header">
+          <button @click="mobileNavOpen = true" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <span class="title" x-text="currentSectionLabel"></span>
+          <div class="flex items-center gap-2 text-white/70 text-sm">
+            <i class="ti ti-coins"></i>
+            <span class="font-semibold" x-text="userCredits"></span>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
           </div>
         </header>
+      </div>
 
+<<<<<<< HEAD
         <template x-if="!token">
           <section class="grid gap-6 lg:grid-cols-12">
 <<<<<<< HEAD
@@ -388,8 +507,20 @@
                   <p class="text-sm font-semibold">Team Ready</p>
                   <p class="text-xs text-[var(--muted)] mt-1">Role-based access, activity timeline.</p>
                 </div>
+=======
+      <!-- Login -->
+      <template x-if="!token">
+        <div class="flex items-center justify-center min-h-screen p-4">
+          <section class="surface p-8 w-full max-w-md reveal">
+            <div class="text-center mb-6">
+              <div class="w-14 h-14 rounded-xl bg-teal-100 flex items-center justify-center mx-auto">
+                <i class="ti ti-mail-forward text-2xl text-teal-600"></i>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
               </div>
+              <h1 class="mt-3 text-2xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
+              <p class="mt-1 text-sm text-[var(--muted)]">Sign in to your account</p>
             </div>
+<<<<<<< HEAD
             <section class="surface p-6 md:p-8 lg:col-span-5 reveal">
               <h2 class="text-xl font-bold text-[var(--ink)]">Sign in</h2>
               <p class="text-sm text-[var(--muted)] mt-1">Use your workspace account.</p>
@@ -410,9 +541,28 @@
                 <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
               </form>
             </section>
+=======
+            <form class="space-y-4" @submit.prevent="login">
+              <div>
+                <label class="text-sm font-medium">Username</label>
+                <input type="text" x-model.trim="loginForm.username" class="field mt-1" required />
+              </div>
+              <div>
+                <label class="text-sm font-medium">Password</label>
+                <input type="password" x-model.trim="loginForm.password" class="field mt-1" required />
+              </div>
+              <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                <span x-show="!busy"><i class="ti ti-login mr-1"></i> Sign in</span>
+                <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Authenticating...</span>
+              </button>
+              <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+            </form>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
           </section>
-        </template>
+        </div>
+      </template>
 
+<<<<<<< HEAD
         <template x-if="token">
           <section class="grid gap-6 lg:grid-cols-12">
             <div class="space-y-6 lg:col-span-5">
@@ -423,6 +573,98 @@
                     <h2 class="font-title text-xl font-semibold">Compose Job</h2>
 =======
               <article class="surface p-5 md:p-6 reveal">
+=======
+      <!-- Authenticated content -->
+      <template x-if="token">
+        <div class="main-area">
+          <div class="max-w-5xl mx-auto p-4 lg:p-6 space-y-6">
+
+            <!-- Section: Dashboard -->
+            <section x-show="currentSection === 'dashboard'" class="space-y-6">
+              <template x-if="busy && !jobs.length">
+                <article class="surface p-8 text-center">
+                  <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-teal-500"></div>
+                  <p class="mt-4 text-sm text-[var(--muted)]">Loading dashboard...</p>
+                </article>
+              </template>
+              <template x-if="!busy || jobs.length">
+                <article class="surface p-5 md:p-6">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="text-xl font-bold text-[var(--ink)]">Dashboard</h2>
+                    <p class="text-xs text-[var(--muted)] mt-1">Welcome back, <span class="font-semibold" x-text="user?.username"></span></p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Credits</p>
+                        <p class="text-2xl font-bold text-[var(--ink)]" x-text="userCredits"></p>
+                      </div>
+                      <i class="ti ti-coins text-2xl text-teal-400"></i>
+                    </div>
+                  </div>
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Sent</p>
+                        <p class="text-2xl font-bold text-emerald-700" x-text="metrics.sent"></p>
+                      </div>
+                      <i class="ti ti-send text-2xl text-emerald-400"></i>
+                    </div>
+                  </div>
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Recipients</p>
+                        <p class="text-2xl font-bold text-[var(--ink)]" x-text="metrics.totalRecipients"></p>
+                      </div>
+                      <i class="ti ti-users text-2xl text-blue-400"></i>
+                    </div>
+                  </div>
+                  <div class="surface-soft p-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
+                        <p class="text-2xl font-bold text-rose-700" x-text="metrics.failed"></p>
+                      </div>
+                      <i class="ti ti-alert-triangle text-2xl text-rose-400"></i>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-6 surface-soft p-4" x-show="metrics.lastJob">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-xs text-[var(--muted)]">Last Job</p>
+                      <p class="font-semibold text-[var(--ink)]" x-text="(metrics.lastJob || {}).subject || 'Untitled'"></p>
+                      <p class="text-xs text-[var(--muted)]" x-text="formatDate((metrics.lastJob || {}).updatedAt)"></p>
+                      <p class="text-xs text-rose-600" x-show="(metrics.lastJob || {}).error" x-text="(metrics.lastJob || {}).error"></p>
+                    </div>
+                    <template x-if="metrics.lastJob">
+                      <span class="pill" :class="{ 'bg-emerald-100 text-emerald-700': metrics.lastJob.status === 'sent', 'bg-amber-100 text-amber-700': metrics.lastJob.status === 'pending', 'bg-rose-100 text-rose-700': metrics.lastJob.status === 'failed' }" x-text="metrics.lastJob.status"></span>
+                    </template>
+                  </div>
+                </div>
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <button class="btn-primary px-5 py-2.5 font-semibold" @click="currentSection = 'compose'">
+                    <i class="ti ti-send mr-1"></i> Compose
+                  </button>
+                  <button class="btn-secondary px-5 py-2.5 text-sm font-semibold" @click="currentSection = 'jobs'">
+                    <i class="ti ti-mail mr-1"></i> Jobs
+                  </button>
+                  <button class="btn-secondary px-5 py-2.5 text-sm font-semibold" @click="showTopUp = true">
+                    <i class="ti ti-coins mr-1"></i> Top Up
+                  </button>
+                </div>
+              </article>
+            </template>
+            </section>
+
+            <!-- Section: Compose -->
+            <section x-show="currentSection === 'compose'" class="space-y-6">
+              <article class="surface p-5 md:p-6">
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="text-xl font-bold text-[var(--ink)]">Compose Job</h2>
@@ -558,15 +800,16 @@
                         <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'text' }" @click="setEditorMode('text')">Text</button>
                       </div>
                     </div>
-                    <div x-show="editorMode === 'visual'">
-                      <input type="hidden" x-model="form.htmlBody" id="trix-output" />
-                      <trix-editor x-ref="trix" input="trix-output" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
-                    </div>
+                    <template x-if="editorMode === 'visual'">
+                      <div>
+                        <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
+                      </div>
+                    </template>
                     <div x-show="editorMode === 'html'">
-                      <textarea rows="12" x-model="form.htmlBody" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
+                      <textarea rows="12" x-model="form.htmlBody" @input="onHtmlInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
                     </div>
                     <div x-show="editorMode === 'text'">
-                      <textarea rows="12" x-model="form.textBody" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="Plain text content"></textarea>
+                      <textarea rows="12" x-model="form.textBody" @input="onTextInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="Plain text content"></textarea>
                     </div>
                     <div class="flex gap-2 mt-2">
                       <button type="button" class="text-xs text-teal-700 underline" @click="insertStarterTemplate">Insert starter</button>
@@ -588,7 +831,7 @@
                       <template x-if="uploadingFile">
                         <div>
                           <i class="ti ti-loader animate-spin text-2xl text-[var(--accent)]"></i>
-                          <p class="text-sm text-[var(--muted)] mt-1">Uploading via file.io...</p>
+                          <p class="text-sm text-[var(--muted)] mt-1">Uploading via tmpfiles.org...</p>
                         </div>
                       </template>
                     </div>
@@ -627,8 +870,9 @@
 >>>>>>> f8d4db3c (New updates.)
                 </form>
               </article>
-            </div>
+            </section>
 
+<<<<<<< HEAD
             <div class="space-y-6 lg:col-span-7">
 <<<<<<< HEAD
               <article class="surface reveal p-6">
@@ -650,6 +894,11 @@
                     <p class="font-title text-xl font-semibold text-rose-700" x-text="jobStats.failed"></p>
 =======
               <article class="surface p-5 md:p-6 reveal">
+=======
+            <!-- Section: Jobs -->
+            <section x-show="currentSection === 'jobs'" class="space-y-6">
+              <article class="surface p-5 md:p-6">
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                 <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div class="surface-soft p-3">
                     <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Total</p>
@@ -672,6 +921,7 @@
               </article>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
               <article class="surface reveal p-6">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
@@ -689,9 +939,12 @@
                       @click="setTab('activity')">Activity</button>
 =======
               <article class="surface p-5 md:p-6 reveal">
+=======
+              <article class="surface p-5 md:p-6">
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 class="text-xl font-bold text-[var(--ink)]">Jobs & Activity</h2>
+                    <h2 class="text-xl font-bold text-[var(--ink)]">Email Jobs</h2>
                     <p class="text-sm text-[var(--muted)]">Search, filter, send, retry.</p>
                   </div>
                   <div class="flex gap-2">
@@ -738,6 +991,7 @@
                       <template x-for="job in filteredJobs" :key="job.id">
                         <div class="surface-soft p-4">
                           <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+<<<<<<< HEAD
                             <div class="space-y-1">
 <<<<<<< HEAD
                               <p class="font-semibold text-base" x-text="job.subject || 'Untitled job'"></p>
@@ -796,16 +1050,20 @@
                             </button>
 =======
                               <p class="font-semibold text-base" x-text="job.subject || 'Untitled'"></p>
+=======
+                            <div class="space-y-1 min-w-0">
+                              <p class="font-semibold text-base break-words" x-text="job.subject || 'Untitled'"></p>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
                               <p class="text-xs text-[var(--muted)]">
                                 <span x-text="job.fromName || job.from || 'Default'"></span> &bull;
                                 <span x-text="job.owner"></span> &bull;
                                 <span x-text="formatDate(job.updatedAt)"></span>
                               </p>
-                              <p class="text-xs text-[var(--muted)]" x-text="(job.recipientsPreview || []).slice(0, 3).join(', ')"></p>
+                              <p class="text-xs text-[var(--muted)] truncate" x-text="(job.recipientsPreview || []).slice(0, 2).join(', ')"></p>
                               <p class="text-xs text-[var(--muted)]" x-text="job.recipientsCount ? `${job.recipientsCount} recipients` : ''"></p>
-                              <p class="text-xs text-[var(--muted)]" x-show="job.attachments?.length" x-text="`${job.attachments.length} attachment(s)`"></p>
+                              <p class="text-xs text-[var(--muted)]" x-show="job.attachments?.length" x-text="(job.attachments || []).length + ' attachment(s)'"></p>
                             </div>
-                            <div class="flex flex-col items-start gap-2 md:items-end">
+                            <div class="flex flex-col items-start gap-2 md:items-end shrink-0">
                               <span class="pill" :class="{ 'bg-emerald-100 text-emerald-700 border-emerald-200': job.status === 'sent', 'bg-amber-100 text-amber-700 border-amber-200': job.status === 'pending', 'bg-rose-100 text-rose-700 border-rose-200': job.status === 'failed', 'bg-sky-100 text-sky-700 border-sky-200': job.status === 'sending' }" x-text="job.status"></span>
                               <p class="text-xs text-[var(--muted)]" x-text="formatJobSummary(job)"></p>
                             </div>
@@ -868,10 +1126,49 @@
                   </div>
                 </template>
               </article>
+            </section>
+
+          </div>
+        </div>
+      </template>
+
+      <!-- Top Up Modal -->
+      <div x-show="showTopUp" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-start justify-center z-50 overflow-y-auto" @click.self="showTopUp = false">
+        <div class="surface p-6 md:p-8 w-full max-w-lg my-12 mx-4">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold text-[var(--ink)]">Top Up Credits</h2>
+            <button @click="showTopUp = false" class="text-[var(--muted)] hover:text-[var(--ink)]"><i class="ti ti-x text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div class="surface-soft p-4 flex items-center justify-between">
+              <div>
+                <p class="text-sm text-[var(--muted)]">Your Balance</p>
+                <p class="text-2xl font-bold text-[var(--ink)]"><span x-text="userCredits"></span> credits</p>
+                <p class="text-xs text-[var(--muted)] mt-1" x-show="topUpSettings.tokenRate > 0">
+                  ≈ $<span x-text="(userCredits / topUpSettings.tokenRate).toFixed(2)"></span> USD
+                  (<span x-text="topUpSettings.tokenRate"></span> tokens per USD)
+                </p>
+              </div>
+              <i class="ti ti-coins text-3xl text-teal-500"></i>
             </div>
-          </section>
-        </template>
+            <div class="surface-soft p-4">
+              <p class="text-sm font-semibold text-[var(--ink)] mb-2">Payment Details</p>
+              <p class="text-sm text-[var(--muted)] whitespace-pre-wrap" x-text="topUpSettings.paymentDetails || 'No payment details configured yet. Contact support.'"></p>
+            </div>
+            <div x-show="topUpSettings.telegramLink" class="surface-soft p-4 flex items-center gap-3">
+              <i class="ti ti-brand-telegram text-2xl text-sky-500"></i>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-[var(--ink)]">Need help?</p>
+                <p class="text-xs text-[var(--muted)]">Contact support on Telegram</p>
+              </div>
+              <a :href="topUpSettings.telegramLink" target="_blank" class="btn-primary px-4 py-2 text-sm font-semibold no-underline inline-block">
+                <i class="ti ti-send mr-1"></i> Message
+              </a>
+            </div>
+            <p class="text-xs text-[var(--muted)]">After making payment, contact support to have credits added to your account.</p>
+          </div>
+        </div>
       </div>
-    </main>
+    </div>
   </body>
 </html>

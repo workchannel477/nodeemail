@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <title>Admin Control Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./config.js"></script>
@@ -26,8 +26,81 @@
 =======
     <style>
       [x-cloak] { display: none !important; }
+      .card-wrap { width: 100%; max-width: 100%; min-width: 0; }
+
+      /* Sidebar */
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        width: 220px;
+        background: #0d3d39;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.25s ease;
+      }
+      .sidebar .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.5rem 0.8rem;
+        margin: 0 0.5rem;
+        color: rgba(255,255,255,0.7);
+        border-radius: 0.45rem;
+        transition: background 0.15s, color 0.15s;
+        cursor: pointer;
+        font-size: 0.85rem;
+        border: none;
+        background: none;
+        width: auto;
+        text-align: left;
+      }
+      .sidebar .nav-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+      .sidebar .nav-item.active { background: rgba(255,255,255,0.15); color: #fff; font-weight: 600; }
+      .sidebar .nav-item i { font-size: 1.1rem; flex-shrink: 0; }
+
+      .main-area {
+        margin-left: 220px;
+        min-height: 100vh;
+      }
+
+      .mobile-header {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        height: 50px;
+        background: #0d3d39;
+        z-index: 45;
+        align-items: center;
+        padding: 0 0.75rem;
+        gap: 0.5rem;
+      }
+      .mobile-header button {
+        background: none; border: none;
+        color: rgba(255,255,255,0.85);
+        font-size: 1.4rem;
+        cursor: pointer;
+        padding: 0.25rem;
+        line-height: 1;
+      }
+      .mobile-header .title { color: #fff; font-size: 0.95rem; font-weight: 600; flex: 1; }
+
+      .mobile-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 35;
+      }
+
+      @media (max-width: 1023px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main-area { margin-left: 0; padding-top: 90px!important; }
+        .mobile-header { display: flex; }
+      }
     </style>
   </head>
+<<<<<<< HEAD
   <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto px-4 py-10" x-data="adminApp()" x-init="init()" x-cloak>
       <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -53,8 +126,60 @@
           <div class="text-center">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
 =======
+=======
+  <body class="bg-gray-50 min-h-screen overflow-x-hidden">
+    <div x-data="adminApp()" x-init="init()" x-cloak>
+      <div x-show="isReady && token" x-cloak>
+        <!-- Sidebar -->
+        <aside class="sidebar" :class="{ 'open': mobileNavOpen }">
+          <div class="p-3 border-b border-white/10 flex items-start justify-between gap-2">
+            <div>
+              <p class="text-white font-bold text-sm flex items-center gap-2">
+                <i class="ti ti-shield-lock text-teal-300"></i> Admin Panel
+              </p>
+              <p class="text-white/50 text-[11px] mt-0.5">Signed in as: <span x-text="user?.username ? user.username : ''"></span></p>
+            </div>
+            <button @click="mobileNavOpen = false" class="lg:hidden text-white/50 hover:text-white p-1 shrink-0" aria-label="Close menu">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <nav class="flex-1 overflow-y-auto py-2 space-y-0.5">
+            <template x-for="item in navItems" :key="item.id">
+              <button class="nav-item" :class="{ 'active': currentSection === item.id }" @click="currentSection = item.id; mobileNavOpen = false">
+                <i :class="'ti ' + item.icon"></i>
+                <span x-text="item.label"></span>
+              </button>
+            </template>
+          </nav>
+          <div class="p-2 border-t border-white/10 space-y-0.5">
+            <button @click="fetchOverview" class="nav-item" :disabled="busy">
+              <i class="ti ti-refresh" :class="{ 'animate-spin': busy }"></i> Refresh
+            </button>
+            <button class="nav-item" @click="redirectHome">
+              <i class="ti ti-home"></i><span>User Home</span>
+            </button>
+            <button class="nav-item" @click="logout">
+              <i class="ti ti-logout"></i><span>Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Mobile overlay -->
+        <div x-show="mobileNavOpen" class="mobile-overlay" @click="mobileNavOpen = false"></div>
+
+        <!-- Mobile header -->
+        <header class="mobile-header">
+          <button @click="mobileNavOpen = true" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <span class="title" x-text="currentSectionLabel"></span>
+        </header>
+      </div>
+
+      <!-- Loading -->
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
       <template x-if="!isReady">
-        <div class="flex items-center justify-center py-20">
+        <div class="flex items-center justify-center min-h-screen py-20">
           <div class="text-center">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
 >>>>>>> f8d4db3c (New updates.)
@@ -63,6 +188,7 @@
         </div>
       </template>
 
+<<<<<<< HEAD
 <<<<<<< HEAD
       <!-- Login Form -->
       <template x-if="isReady && !token">
@@ -609,31 +735,201 @@ http://host:port"></textarea>
                   <div class="grid grid-cols-2 gap-3">
                     <input type="email" x-model="smtpForm.from" placeholder="From" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
                     <input type="number" x-model.number="smtpForm.port" placeholder="Port" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                  </div>
-                  <input type="text" x-model="smtpForm.host" placeholder="smtp.example.com" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                  <div class="grid grid-cols-2 gap-3">
-                    <input type="text" x-model="smtpForm.username" placeholder="Username" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                    <input type="password" x-model="smtpForm.password" placeholder="Password" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                  </div>
-                  <button @click="addSmtp" class="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Add to rotation</button>
-                </div>
+=======
+      <!-- Login -->
+      <template x-if="isReady && !token">
+        <div class="flex items-center justify-center min-h-screen p-4">
+          <section class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg mx-auto">
+            <div class="text-center mb-6">
+              <i class="ti ti-shield-lock text-5xl text-teal-500 mb-4"></i>
+              <h2 class="text-2xl font-semibold text-gray-800">Admin Login</h2>
+              <p class="text-gray-500 mt-2">Sign in with administrator credentials</p>
+            </div>
+            <form class="space-y-5" @submit.prevent="login">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                <input type="text" x-model.trim="loginForm.username" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter admin username" required />
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Active SMTP servers</h3>
-                <div class="overflow-x-auto rounded-lg border border-gray-200">
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                      <tr><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Label</th><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Host</th><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 bg-white">
-                      <template x-for="server in smtpPool.servers" :key="server.id">
-                        <tr><td class="px-4 py-2 whitespace-nowrap" x-text="server.label"></td><td class="px-4 py-2 whitespace-nowrap" x-text="server.host"></td><td class="px-4 py-2"><button @click="deleteSmtp(server.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"><i class="ti ti-trash"></i></button></td></tr>
-                      </template>
-                    </tbody>
-                  </table>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" x-model.trim="loginForm.password" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Enter password" required />
+              </div>
+              <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-3 rounded-lg transition duration-200" :disabled="busy">
+                <span x-show="!busy" class="inline-flex items-center justify-center gap-2"><i class="ti ti-login"></i> Sign In</span>
+                <span x-show="busy" class="inline-flex items-center justify-center gap-2"><i class="ti ti-loader animate-spin"></i> Authenticating...</span>
+              </button>
+              <p class="text-sm text-red-600 text-center" x-show="error" x-text="error"></p>
+            </form>
+          </section>
+        </div>
+      </template>
+
+      <!-- Authenticated Content -->
+      <template x-if="isReady && token">
+        <div class="main-area p-4 lg:p-6">
+          <div class="max-w-6xl mx-auto">
+
+            <!-- Section: Dashboard -->
+            <section x-show="currentSection === 'dashboard'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div>
+                  <div class="flex items-center gap-3 mb-2">
+                    <i class="ti ti-user-cog text-2xl text-teal-500"></i>
+                    <h2 class="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
+                  </div>
+                  <p class="text-gray-600">Signed in as <span class="font-semibold" x-text="user?.username"></span> &bull; Role: <span class="capitalize font-semibold" x-text="user?.role"></span></p>
+                </div>
+                <div class="flex gap-3 flex-wrap">
+                  <button @click="fetchOverview" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100" :disabled="busy">
+                    <i class="ti ti-refresh" :class="{ 'animate-spin': busy }"></i> Refresh
+                  </button>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm text-gray-500">Total Users</p><p class="text-2xl font-bold text-gray-800" x-text="stats.totalUsers || 0"></p></div>
+                    <i class="ti ti-users text-gray-400 text-xl"></i>
+                  </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm text-gray-500">Active Jobs</p><p class="text-2xl font-bold text-gray-800" x-text="stats.totalJobs || 0"></p></div>
+                    <i class="ti ti-mail text-gray-400 text-xl"></i>
+                  </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm text-gray-500">IP Proxies</p><p class="text-2xl font-bold text-gray-800" x-text="stats.proxyCount || 0"></p></div>
+                    <i class="ti ti-rotate-clockwise text-gray-400 text-xl"></i>
+                  </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <div class="flex items-center justify-between">
+                    <div><p class="text-sm text-gray-500">Active Sessions</p><p class="text-2xl font-bold text-gray-800" x-text="stats.sessionCount || 0"></p></div>
+                    <i class="ti ti-clock text-gray-400 text-xl"></i>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Section: Users -->
+            <section x-show="currentSection === 'users'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-users text-2xl text-teal-500"></i>
+                  <h2 class="text-xl font-semibold text-gray-800">User Management</h2>
+                </div>
+                <button @click="showAddUserModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                  <i class="ti ti-plus"></i> Add User
+                </button>
+              </div>
+              <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Credits</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost/Email</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="u in overview.users" :key="u.id">
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center"><i class="ti ti-user mr-3 text-gray-400"></i><span class="font-medium text-gray-900" x-text="u.username"></span></div></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="u.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'" x-text="u.role"></span></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="u.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"><i class="ti ti-circle-filled text-xs mr-1"></i><span x-text="u.status"></span></span></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="font-semibold" x-text="u.credits ?? 0"></span> <span class="text-xs text-gray-500" x-text="`(${u.creditsUsed || 0} used)`"></span></td>
+                        <td class="px-6 py-4 whitespace-nowrap" x-text="u.costPerEmail ?? 1"></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 text-sm" x-text="formatDate(u.createdAt)"></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div class="flex gap-1">
+                            <button @click="editUser(u)" class="text-teal-600 hover:text-teal-900 p-1" title="Edit"><i class="ti ti-edit"></i></button>
+                            <button @click="openChangePasswordModal(u)" class="text-blue-600 hover:text-blue-900 p-1" title="Change password"><i class="ti ti-key"></i></button>
+                            <button @click="openCreditsModal(u)" class="text-amber-600 hover:text-amber-900 p-1" title="Manage credits"><i class="ti ti-coins"></i></button>
+                            <button @click="openFeaturesModal(u)" class="text-gray-600 hover:text-gray-900 p-1" title="Manage features"><i class="ti ti-settings"></i></button>
+                            <button @click="deleteUser(u.id)" class="text-red-600 hover:text-red-900 p-1" title="Delete"><i class="ti ti-trash"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <template x-if="!overview.users?.length">
+                <div class="text-center py-12"><i class="ti ti-users-off text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">No users found</p></div>
+              </template>
+            </section>
+
+            <!-- Section: Credits & Features -->
+            <section x-show="currentSection === 'credits'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-coins text-2xl text-teal-500"></i>
+                  <div>
+                    <h2 class="text-xl font-semibold text-gray-800">Credits & Features</h2>
+                    <p class="text-sm text-gray-500">Manage per-user credits, per-email cost, and feature toggles.</p>
+                  </div>
+                </div>
+                <button @click="loadCreditData" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100">
+                  <i class="ti ti-refresh"></i> Refresh
+                </button>
+              </div>
+              <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Credits</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Used</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Per Email</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachments</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rich Editor</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Max/Job</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="c in creditData" :key="c.id">
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 font-medium" x-text="c.username"></td>
+                        <td class="px-4 py-3"><span class="font-semibold" x-text="c.credits"></span></td>
+                        <td class="px-4 py-3 text-gray-500" x-text="c.creditsUsed"></td>
+                        <td class="px-4 py-3" x-text="c.costPerEmail"></td>
+                        <td class="px-4 py-3"><span :class="c.features?.attachments ? 'text-green-600' : 'text-red-600'" x-text="c.features?.attachments ? 'Yes' : 'No'"></span></td>
+                        <td class="px-4 py-3"><span :class="c.features?.richEditor ? 'text-green-600' : 'text-red-600'" x-text="c.features?.richEditor ? 'Yes' : 'No'"></span></td>
+                        <td class="px-4 py-3" x-text="c.features?.maxRecipientsPerJob || 500"></td>
+                        <td class="px-4 py-3">
+                          <div class="flex gap-1">
+                            <button @click="openCreditsModal({id: c.id, username: c.username, credits: c.credits, costPerEmail: c.costPerEmail})" class="text-teal-600 hover:text-teal-900 p-1" title="Edit credits"><i class="ti ti-coins"></i></button>
+                            <button @click="openFeaturesModal({id: c.id, username: c.username, features: c.features})" class="text-gray-600 hover:text-gray-900 p-1" title="Edit features"><i class="ti ti-settings"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <template x-if="!creditData.length">
+                <div class="text-center py-8"><p class="text-gray-500">No credit data loaded.</p></div>
+              </template>
+            </section>
+
+            <!-- Section: IP Rotation -->
+            <section x-show="currentSection === 'ip'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-rotate-clockwise text-2xl text-teal-500"></i>
+                  <h2 class="text-xl font-semibold text-gray-800">IP Rotation</h2>
                 </div>
 >>>>>>> f8d4db3c (New updates.)
               </div>
+<<<<<<< HEAD
             </div>
           </section>
 
@@ -1018,6 +1314,254 @@ http://host:port"></textarea>
 >>>>>>> f8d4db3c (New updates.)
             </div>
           </section>
+=======
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Proxy List (One per line)</label>
+                <textarea x-model="ipForm.proxies" rows="6" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono text-sm" placeholder="http://user:pass@host:port\nsocks5://host:port"></textarea>
+              </div>
+              <div class="flex gap-3">
+                <button @click="updateIPRotation" class="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700"><i class="ti ti-device-floppy"></i> Save Proxies</button>
+                <button @click="loadIPRotation" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"><i class="ti ti-refresh"></i> Load Current</button>
+              </div>
+            </section>
+
+            <!-- Section: SMTP -->
+            <section x-show="currentSection === 'smtp'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-mail-cog text-2xl text-teal-500"></i>
+                  <h2 class="text-xl font-semibold text-gray-800">SMTP Pool</h2>
+                </div>
+                <button @click="loadSmtpPool" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"><i class="ti ti-refresh"></i> Refresh</button>
+              </div>
+              <div class="grid gap-4 md:grid-cols-3 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Rotate after (emails)</label>
+                  <div class="flex gap-2">
+                    <input type="number" min="1" x-model.number="smtpPool.rotateAfter" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <button @click="updateSmtpRotation" class="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Save</button>
+                  </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4"><p class="text-sm text-gray-500">Configured servers</p><p class="text-2xl font-bold text-gray-800" x-text="smtpPool.servers?.length || 0"></p></div>
+                <div class="bg-gray-50 rounded-lg p-4"><p class="text-sm text-gray-500">Rotation progress</p><p class="text-base text-gray-800"><span class="font-semibold" x-text="smtpPool.sentSinceRotation || 0"></span> on server <span class="font-semibold" x-text="(smtpPool.currentIndex || 0) + 1"></span></p></div>
+              </div>
+              <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 mb-4">Add SMTP server</h3>
+                  <div class="space-y-4">
+                    <input type="text" x-model="smtpForm.label" placeholder="Label" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <div class="grid grid-cols-2 gap-3">
+                      <input type="email" x-model="smtpForm.from" placeholder="From" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                      <input type="number" x-model.number="smtpForm.port" placeholder="Port" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <input type="text" x-model="smtpForm.host" placeholder="smtp.example.com" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <div class="grid grid-cols-2 gap-3">
+                      <input type="text" x-model="smtpForm.username" placeholder="Username" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                      <input type="password" x-model="smtpForm.password" placeholder="Password" class="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <button @click="addSmtp" class="w-full bg-teal-600 text-white py-2 rounded-lg hover:bg-teal-700">Add to rotation</button>
+                  </div>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 mb-4">Active SMTP servers</h3>
+                  <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                        <tr><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Label</th><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Host</th><th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th></tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-200 bg-white">
+                        <template x-for="server in smtpPool.servers" :key="server.id">
+                          <tr><td class="px-4 py-2 whitespace-nowrap" x-text="server.label"></td><td class="px-4 py-2 whitespace-nowrap" x-text="server.host"></td><td class="px-4 py-2"><button @click="deleteSmtp(server.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"><i class="ti ti-trash"></i></button></td></tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Section: Providers -->
+            <section x-show="currentSection === 'providers'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-mail-forward text-2xl text-teal-500"></i>
+                  <div><h2 class="text-xl font-semibold text-gray-800">Mail Providers</h2><p class="text-sm text-gray-500">Resend API and SMTP with quotas.</p></div>
+                </div>
+                <button @click="openProviderForm()" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-500"><i class="ti ti-plus"></i> Add provider</button>
+              </div>
+              <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Provider</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Quotas</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Usage</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th><th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th></tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="!mailProviders.length">
+                      <tr><td colspan="6" class="px-5 py-8 text-center text-gray-500">No providers configured.</td></tr>
+                    </template>
+                    <template x-for="provider in mailProviders" :key="provider.id">
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-5 py-4"><div class="font-semibold" x-text="provider.name"></div></td>
+                        <td class="px-5 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="provider.type === 'resend' ? 'bg-sky-100 text-sky-800' : 'bg-blue-100 text-blue-800'" x-text="provider.type?.toUpperCase()"></span></td>
+                        <td class="px-5 py-4 text-sm"><div>Per min: <span class="font-semibold" x-text="provider.quotaPerMinute || '∞'"></span></div><div>Per day: <span class="font-semibold" x-text="provider.quotaPerDay || '∞'"></span></div></td>
+                        <td class="px-5 py-4 text-sm text-gray-700" x-text="providerUsageSummary(provider)"></td>
+                        <td class="px-5 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="provider.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'"><i class="ti ti-circle-filled text-xs mr-1"></i><span x-text="provider.enabled ? 'Enabled' : 'Disabled'"></span></span></td>
+                        <td class="px-5 py-4"><div class="flex flex-wrap gap-2">
+                          <button @click="openProviderForm(provider)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-teal-50 text-teal-600 rounded hover:bg-teal-100"><i class="ti ti-edit"></i> Manage</button>
+                          <button @click="resetProviderUsage(provider.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-amber-50 text-amber-700 rounded hover:bg-amber-100"><i class="ti ti-restore"></i> Reset</button>
+                          <button @click="deleteProvider(provider.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"><i class="ti ti-trash"></i></button>
+                        </div></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Section: Rate Limits -->
+            <section x-show="currentSection === 'ratelimits'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-speedometer text-2xl text-teal-500"></i>
+                  <h2 class="text-xl font-semibold text-gray-800">Rate Limits</h2>
+                </div>
+                <button @click="resetAllRateLimits" class="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><i class="ti ti-eraser"></i> Reset All</button>
+              </div>
+              <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Count (Last Minute)</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="[username, timestamps] in Object.entries(rateLimits.limits || {})" :key="username">
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap"><i class="ti ti-user mr-3 text-gray-400"></i><span class="font-medium" x-text="username"></span></td>
+                        <td class="px-6 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="timestamps.length > 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'"><span x-text="timestamps.length"></span></span></td>
+                        <td class="px-6 py-4"><button @click="resetUserRateLimit(username)" class="inline-flex items-center gap-2 px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded hover:bg-blue-200"><i class="ti ti-eraser"></i> Reset</button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Section: Jobs -->
+            <section x-show="currentSection === 'jobs'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-mail text-2xl text-teal-500"></i>
+                  <h2 class="text-xl font-semibold text-gray-800">Email Jobs</h2>
+                </div>
+              </div>
+              <div class="mb-6 flex gap-3 flex-wrap">
+                <button @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">All</button>
+                <button @click="activeTab = 'pending'" :class="activeTab === 'pending' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">Pending</button>
+                <button @click="activeTab = 'sent'" :class="activeTab === 'sent' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">Sent</button>
+                <button @click="activeTab = 'failed'" :class="activeTab === 'failed' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg">Failed</button>
+              </div>
+              <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipients</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Summary</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="job in filteredJobs" :key="job.id">
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4"><div class="max-w-xs truncate font-medium" x-text="job.subject"></div></td>
+                        <td class="px-6 py-4 whitespace-nowrap" x-text="job.owner"></td>
+                        <td class="px-6 py-4"><div class="max-w-xs truncate text-sm" x-text="(job.recipientsPreview || []).slice(0, 3).join(', ')"></div><div class="text-xs text-gray-400" x-text="job.recipientsCount ? `(${job.recipientsCount} total)` : ''"></div></td>
+                        <td class="px-6 py-4"><span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="{'bg-green-100 text-green-800': job.status === 'sent','bg-yellow-100 text-yellow-800': job.status === 'pending','bg-red-100 text-red-800': job.status === 'failed','bg-blue-100 text-blue-800': job.status === 'sending'}"><span x-text="job.status"></span></span></td>
+                        <td class="px-6 py-4 text-sm text-gray-700" x-text="formatJobSummary(job)"></td>
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="flex gap-2">
+                          <button @click="sendJob(job.id)" :disabled="job.status === 'sending'" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-green-100 text-green-600 rounded hover:bg-green-200 disabled:opacity-50"><i class="ti ti-send"></i></button>
+                          <button @click="clearRecipientLog(job.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-amber-100 text-amber-700 rounded hover:bg-amber-200"><i class="ti ti-eraser"></i></button>
+                          <button @click="deleteJobView(job.id)" class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"><i class="ti ti-trash"></i></button>
+                        </div></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Section: Data Sync -->
+            <section x-show="currentSection === 'datasync'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-database text-2xl text-teal-500"></i>
+                  <div>
+                    <h2 class="text-xl font-semibold text-gray-800">Data Sync</h2>
+                    <p class="text-sm text-gray-500">Sync file-based JSON data to Firebase Firestore.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="space-y-4">
+                <div class="flex flex-wrap gap-3">
+                  <button @click="syncToFirebase" :disabled="syncBusy" class="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                    <i class="ti ti-cloud-upload" :class="{ 'animate-spin': syncBusy }"></i>
+                    <span x-text="syncBusy ? 'Syncing...' : 'Sync JSON to Firebase'"></span>
+                  </button>
+                  <button @click="syncLog = []" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    <i class="ti ti-clear-all"></i> Clear Log
+                  </button>
+                </div>
+                <div x-show="syncLog.length" class="bg-gray-900 text-green-400 rounded-lg p-4 font-mono text-xs max-h-64 overflow-y-auto">
+                  <template x-for="line in syncLog" :key="line">
+                    <div class="leading-relaxed" x-text="line"></div>
+                  </template>
+                </div>
+                <div x-show="!syncLog.length" class="text-center py-8 text-gray-400 text-sm">
+                  <i class="ti ti-database-off text-3xl mb-2"></i>
+                  <p>Run a sync to see results here.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Section: Payment -->
+            <section x-show="currentSection === 'payment'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ti ti-credit-card text-2xl text-teal-500"></i>
+                <div>
+                  <h2 class="text-xl font-semibold text-gray-800">Payment & Support Settings</h2>
+                  <p class="text-sm text-gray-500">Set payment info and Telegram support link shown to users.</p>
+                </div>
+              </div>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Payment Details</label>
+                  <textarea rows="5" x-model="paymentSettings.paymentDetails" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono text-sm" placeholder="Bank: Account 12345&#10;Crypto: BTC address...&#10;UPI: user@upi"></textarea>
+                  <p class="text-xs text-gray-400 mt-1">Shown in the user's Top Up section.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Telegram Support Link</label>
+                  <input type="url" x-model="paymentSettings.telegramLink" class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="https://t.me/your_support" />
+                  <p class="text-xs text-gray-400 mt-1">Displayed as a contact button in the user's Top Up section.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Token-to-USD Rate</label>
+                  <div class="flex gap-2 items-center">
+                    <span class="text-sm text-gray-500">1 USD =</span>
+                    <input type="number" min="1" x-model.number="paymentSettings.tokenRate" class="w-28 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <span class="text-sm text-gray-500">tokens</span>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-1">How many tokens per 1 USD. Shown in the Top Up modal.</p>
+                </div>
+                <div class="flex gap-3">
+                  <button @click="savePaymentSettings" :disabled="paymentSettingsBusy" class="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                    <i class="ti ti-device-floppy"></i> <span x-text="paymentSettingsBusy ? 'Saving...' : 'Save Settings'"></span>
+                  </button>
+                  <button @click="loadPaymentSettings" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    <i class="ti ti-refresh"></i> Reload
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- Message / Error -->
+            <p class="text-center text-sm text-gray-500 mt-6" x-show="message" x-text="message"></p>
+            <p class="text-center text-sm text-red-600 mt-2" x-show="error" x-text="error"></p>
+
+          </div>
+>>>>>>> 102efad6 (feat: implement app settings management, migrate file uploads to tmpfiles.org, and add Firebase sync utilities)
         </div>
       </template>
 
@@ -1316,9 +1860,6 @@ http://host:port"></textarea>
           </form>
         </div>
       </div>
-
-      <p class="mt-8 text-center text-sm text-gray-500" x-show="message" x-text="message"></p>
-      <p class="mt-2 text-center text-sm text-red-600" x-show="error" x-text="error"></p>
     </div>
 >>>>>>> f8d4db3c (New updates.)
   </body>
