@@ -652,6 +652,10 @@ const dashboardAppDefinition = () => ({
     initQuillEditor() {
       const container = this.$refs.quill;
       if (!container || this.quill) return;
+      if (!container.offsetParent) {
+        setTimeout(() => this.initQuillEditor(), 500);
+        return;
+      }
       try {
         this.quill = new Quill(container, {
           theme: 'snow',
@@ -659,7 +663,7 @@ const dashboardAppDefinition = () => ({
             toolbar: [
               ['bold', 'italic', 'underline', 'strike'],
               [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-              ['link', 'image'],
+              ['link'],
               ['clean']
             ]
           }
