@@ -645,7 +645,7 @@ const dashboardAppDefinition = () => ({
       ].join('\n');
       this.form.textBody = 'Hello {{first_name}},\n\nThis is a quick update from our team.\n\nBest regards,\nYour Team';
       this.editorMode = 'visual';
-      this.$nextTick(() => { if (this.quill) this.quill.root.innerHTML = this.form.htmlBody; });
+      if (this.quill) this.quill.root.innerHTML = this.form.htmlBody;
       this.persistDraft();
     },
 
