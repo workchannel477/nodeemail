@@ -65,6 +65,7 @@ const adminAppDefinition = () => ({
     telegramReplyText: '',
     telegramSending: false,
     telegramBusy: false,
+    telegramShowChat: false,
     navItems: [
       { id: 'dashboard', label: 'Dashboard', icon: 'ti-dashboard' },
       { id: 'users', label: 'Users', icon: 'ti-users' },
@@ -524,6 +525,7 @@ const adminAppDefinition = () => ({
     async selectTelegramContact(contact) {
       this.telegramActiveChat = contact;
       this.telegramMessages = [];
+      this.telegramShowChat = true;
       try {
         const response = await apiFetch(`/admin/telegram/contacts/${contact.id}/messages`, { headers: this.headers() });
         if (!response.ok) return;
