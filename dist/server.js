@@ -580,7 +580,7 @@ async function saveAppSettings(data) {
 
 // ---------- Telegram Bot ----------
 
-let telegramPollInterval = null;
+let telegramPollTimeout = null;
 let telegramBotToken = '';
 let telegramBotUsername = '';
 let telegramUpdateOffset = 0;
@@ -616,7 +616,7 @@ async function startTelegramBot(token) {
     if (!data.ok) throw new Error(data.description || 'Invalid token');
     telegramBotUsername = data.result.username;
     telegramUpdateOffset = 0;
-    telegramPollInterval = setInterval(pollTelegramUpdates, 3000);
+    pollTelegramUpdates();
     return { status: 'running', botUsername: telegramBotUsername };
   } catch (err) {
     telegramBotToken = '';
@@ -625,9 +625,9 @@ async function startTelegramBot(token) {
 }
 
 function stopTelegramBot() {
-  if (telegramPollInterval) {
-    clearInterval(telegramPollInterval);
-    telegramPollInterval = null;
+  if (telegramPollTimeout) {
+    clearTimeout(telegramPollTimeout);
+    telegramPollTimeout = null;
   }
   telegramBotToken = '';
   telegramBotUsername = '';
@@ -641,7 +641,6 @@ async function pollTelegramUpdates() {
     const response = await fetch(url);
     const data = await response.json();
     if (!data.ok) return;
-    let changed = false;
     for (const update of data.result || []) {
       const msg = update.message;
       if (!msg) continue;
@@ -679,10 +678,12 @@ async function pollTelegramUpdates() {
       if (tgData.messages[chatId].length > 500) tgData.messages[chatId] = tgData.messages[chatId].slice(-500);
       await saveTelegramData(tgData);
       telegramUpdateOffset = update.update_id;
-      changed = true;
     }
   } catch (err) {
     console.error('Telegram poll error:', err.message);
+  }
+  if (telegramBotToken) {
+    telegramPollTimeout = setTimeout(pollTelegramUpdates, 3000);
   }
 }
 
@@ -1866,7 +1867,7 @@ app.post("/admin/data-sync", requireAuth, requireAdmin, async (req, res) => {
 app.post("/admin/sync-to-firebase", requireAuth, requireAdmin, async (req, res) => {
   if (!db) return res.status(400).json({ message: "Firebase is not configured or not connected. Set FIREBASE_* env vars." });
   try {
-    const results = { users: 0, jobs: 0, recipients: 0, smtpPool: false, ipRotation: false, rateLimits: false, mailProviders: false, activity: 0, errors: [] };
+    const results = { users: 0, jobs: 0, recipients: 0, smtpPool: false, ipRotation: false, rateLimits: false, mailProviders: false, telegram: false, activity: 0, errors: [] };
 
     // Sync users
     const authData = await readJsonFallback(authFilePath, { users: [] });
@@ -1903,21 +1904,31 @@ app.post("/admin/sync-to-firebase", requireAuth, requireAdmin, async (req, res) 
     const smtpData = await readJsonFallback(smtpPoolFilePath, { servers: [], currentIndex: 0, sentSinceRotation: 0, rotateAfter: SMTP_ROTATE_AFTER_DEFAULT });
     await db.collection("config").doc("smtpPool").set(smtpData);
     results.smtpPool = true;
+    await writeJsonFallback(smtpPoolFilePath, { servers: [], currentIndex: 0, sentSinceRotation: 0, rotateAfter: SMTP_ROTATE_AFTER_DEFAULT });
 
     // Sync mail providers
     const providerData = await readJsonFallback(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
     await db.collection("config").doc("mailProviders").set(providerData);
     results.mailProviders = true;
+    await writeJsonFallback(mailProvidersFilePath, { providers: [], rotationIndex: 0 });
 
     // Sync ip rotation
     const ipData = await readJsonFallback(ipRotationFilePath, { proxies: [], currentIndex: 0 });
     await db.collection("config").doc("ipRotation").set(ipData);
     results.ipRotation = true;
+    await writeJsonFallback(ipRotationFilePath, { proxies: [], currentIndex: 0 });
 
     // Sync rate limits
     const rateData = await readJsonFallback(rateLimitFilePath, { limits: {} });
     await db.collection("config").doc("rateLimits").set(rateData);
     results.rateLimits = true;
+    await writeJsonFallback(rateLimitFilePath, { limits: {} });
+
+    // Sync telegram data
+    const telegramData = await loadTelegramData();
+    await db.collection("config").doc("telegram").set(telegramData);
+    results.telegram = true;
+    await writeJsonFallback(telegramDataPath, { botToken: '', contacts: {}, messages: {} });
 
     // Sync activity log
     const activityData = await readJsonFallback(activityLogPath, { entries: [] });
@@ -1926,8 +1937,9 @@ app.post("/admin/sync-to-firebase", requireAuth, requireAdmin, async (req, res) 
       await db.collection("activity").add(entry);
       results.activity++;
     }
+    await writeJsonFallback(activityLogPath, { entries: [] });
 
-    res.json({ message: "Sync to Firebase complete", results });
+    res.json({ message: "Sync to Firebase complete. Local files cleared.", results });
   } catch (err) {
     res.status(500).json({ message: err.message || "Sync failed" });
   }
@@ -2295,7 +2307,7 @@ app.post("/admin/providers/:id/reset-usage", requireAuth, requireAdmin, async (r
 app.get("/admin/telegram/bot", requireAuth, requireAdmin, async (_req, res) => {
   const data = await loadTelegramData();
   res.json({
-    status: telegramPollInterval ? 'running' : 'stopped',
+    status: telegramBotToken ? 'running' : 'stopped',
     botUsername: telegramBotUsername,
     hasToken: Boolean(data.botToken),
   });
@@ -2332,7 +2344,9 @@ app.get("/admin/telegram/contacts", requireAuth, requireAdmin, async (_req, res)
 
 app.get("/admin/telegram/contacts/:id/messages", requireAuth, requireAdmin, async (req, res) => {
   const data = await loadTelegramData();
+  const seen = new Set();
   const messages = (data.messages[req.params.id] || [])
+    .filter((m) => { const k = m.id; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   if (data.contacts && data.contacts[req.params.id]) {
     data.contacts[req.params.id].unread = 0;
