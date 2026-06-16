@@ -148,6 +148,7 @@ document.addEventListener('alpine:init', () => {
         this.form.bcc = job.bcc || '';
         this.editingJobId = job.id;
         this.editingJobSubject = job.subject;
+        this.currentSection = 'compose';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (error) {
         this.error = error.message;
@@ -187,6 +188,7 @@ document.addEventListener('alpine:init', () => {
         this.editingJobId = null;
         this.editingJobSubject = '';
         this.message = wasEditing ? 'Job updated. Use Send in the actions column when ready.' : 'Job saved. Use Send in the actions column when ready.';
+        this.currentSection = 'jobs';
         setTimeout(() => (this.message = ''), 4000);
         await Promise.all([this.fetchJobs(), this.refreshProfile(), this.loadActivity(true)]);
       } catch (error) {

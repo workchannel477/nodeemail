@@ -899,6 +899,7 @@ const dashboardAppDefinition = () => ({
         this.$nextTick(() => { if (this.quill && this.form.htmlBody) this.quill.root.innerHTML = this.form.htmlBody; });
         this.persistDraft();
         this.saveAttachmentsDraft();
+        this.currentSection = 'compose';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (error) { this.error = error.message; } finally { this.recipientsBusy = false; }
     },
@@ -943,6 +944,7 @@ const dashboardAppDefinition = () => ({
         this.attachments = [];
         this.clearDraft();
         this.message = wasEditing ? 'Job updated. Use Send when ready.' : 'Job saved. Use Send when ready.';
+        this.currentSection = 'jobs';
         setTimeout(() => { this.message = ''; }, 4000);
         await Promise.all([this.fetchJobs(), this.refreshProfile(), this.loadActivity(true)]);
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
