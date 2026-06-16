@@ -46,6 +46,7 @@
         .mobile-header { display: flex; }
       }
       .card-wrap { width: 100%; max-width: 100%; min-width: 0; }
+      [x-cloak] { display: none !important; }
     </style>
   </head>
   <body class="bg-gray-50 min-h-screen overflow-x-hidden">
@@ -671,7 +672,7 @@
       </template>
 
       <!-- Provider Modal -->
-      <div x-show="providerFormVisible" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="providerFormVisible" style="display:none" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-16 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800" x-text="editingProviderId ? 'Edit Mail Provider' : 'Add Mail Provider'"></h3>
@@ -702,7 +703,7 @@
       </div>
 
       <!-- Add User Modal -->
-      <div x-show="showAddUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="showAddUserModal" style="display:none" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Add New User</h3>
@@ -725,7 +726,7 @@
       </div>
 
       <!-- Change Password Modal -->
-      <div x-show="isChangePasswordModalOpen" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="isChangePasswordModalOpen" style="display:none" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Change Password</h3>
@@ -744,7 +745,7 @@
       </div>
 
       <!-- Edit User Modal -->
-      <div x-show="showEditUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="showEditUserModal" style="display:none" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Edit User</h3>
@@ -764,7 +765,7 @@
       </div>
 
       <!-- Credits Modal -->
-      <div x-show="creditsModalVisible" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="creditsModalVisible" style="display:none" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Manage Credits</h3>
@@ -783,7 +784,7 @@
       </div>
 
       <!-- Features Modal -->
-      <div x-show="featuresModalVisible" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div x-show="featuresModalVisible" style="display:none" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xl font-semibold text-gray-800">Manage Features</h3>
