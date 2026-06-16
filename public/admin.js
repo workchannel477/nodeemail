@@ -495,7 +495,7 @@ const dashboardAppDefinition = () => ({
     jobSearch: '',
     statusFilter: 'all',
     loginForm: { username: '', password: '' },
-    form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '' },
+    form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '', cc: '', bcc: '' },
     attachments: [],
     uploadingFile: false,
     uploadProgress: 0,
@@ -602,6 +602,8 @@ const dashboardAppDefinition = () => ({
         this.form.recipients = draft.recipients || this.form.recipients;
         this.form.htmlBody = draft.htmlBody || this.form.htmlBody;
         this.form.textBody = draft.textBody || this.form.textBody;
+        this.form.cc = draft.cc || this.form.cc;
+        this.form.bcc = draft.bcc || this.form.bcc;
       } catch (error) { localStorage.removeItem(this.composerDraftKey()); }
     },
 
@@ -888,6 +890,8 @@ const dashboardAppDefinition = () => ({
         this.form.recipients = recipients;
         this.form.htmlBody = job.htmlBody || '';
         this.form.textBody = job.textBody || '';
+        this.form.cc = job.cc || '';
+        this.form.bcc = job.bcc || '';
         this.attachments = Array.isArray(job.attachments) ? job.attachments : [];
         this.editorMode = job.htmlBody && !job.textBody ? 'visual' : 'text';
         this.editingJobId = job.id;
@@ -925,6 +929,8 @@ const dashboardAppDefinition = () => ({
           recipients: this.form.recipients,
           htmlBody: this.form.htmlBody || '',
           textBody: this.form.textBody || '',
+          cc: this.form.cc || '',
+          bcc: this.form.bcc || '',
           attachments: this.attachments
         };
         const response = await apiFetch(url, { method: this.editingJobId ? 'PUT' : 'POST', headers: this.headers(), body: JSON.stringify(body) });

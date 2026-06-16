@@ -21,7 +21,9 @@ document.addEventListener('alpine:init', () => {
       replyTo: '',
       subject: '',
       recipients: '',
-      htmlBody: ''
+      htmlBody: '',
+      cc: '',
+      bcc: ''
     },
     init() {
       if (this.token) {
@@ -142,6 +144,8 @@ document.addEventListener('alpine:init', () => {
         this.form.subject = job.subject || '';
         this.form.recipients = recipients;
         this.form.htmlBody = job.htmlBody || '';
+        this.form.cc = job.cc || '';
+        this.form.bcc = job.bcc || '';
         this.editingJobId = job.id;
         this.editingJobSubject = job.subject;
         window.scrollTo({ top: 0, behavior: 'smooth' });

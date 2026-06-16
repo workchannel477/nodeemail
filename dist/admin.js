@@ -1,5 +1,12 @@
 const apiUrl = (path) => (window.API ? window.API.url(path) : path);
-const apiFetch = (path, options) => fetch(apiUrl(path), options);
+const apiFetch = (path, options) => fetch(apiUrl(path), options).then((response) => {
+  if (response.status === 401 && options && options.headers && options.headers.Authorization) {
+    localStorage.removeItem('mailer_token');
+    localStorage.removeItem('mailer_user');
+    window.location.reload();
+  }
+  return response;
+});
 const valueOr = (value, fallback) => (value === undefined || value === null ? fallback : value);
 const readApiMessage = async (response, fallback = 'Request failed') => {
   try {
@@ -488,10 +495,11 @@ const dashboardAppDefinition = () => ({
     jobSearch: '',
     statusFilter: 'all',
     loginForm: { username: '', password: '' },
-    form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '' },
+    form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '', cc: '', bcc: '' },
     attachments: [],
     uploadingFile: false,
     uploadProgress: 0,
+    quill: null,
     editorMode: 'visual',
     userCredits: 0,
     creditsPerEmail: 1,
@@ -560,6 +568,7 @@ const dashboardAppDefinition = () => ({
         this.loadAttachmentsDraft();
         this.loadTopUpSettings();
       }
+      this.$nextTick(() => this.initQuillEditor());
     },
 
     headers() {
@@ -593,6 +602,8 @@ const dashboardAppDefinition = () => ({
         this.form.recipients = draft.recipients || this.form.recipients;
         this.form.htmlBody = draft.htmlBody || this.form.htmlBody;
         this.form.textBody = draft.textBody || this.form.textBody;
+        this.form.cc = draft.cc || this.form.cc;
+        this.form.bcc = draft.bcc || this.form.bcc;
       } catch (error) { localStorage.removeItem(this.composerDraftKey()); }
     },
 
@@ -617,8 +628,7 @@ const dashboardAppDefinition = () => ({
         this.attachments = [];
         this.editingJobId = null;
         this.editingJobSubject = '';
-        const trix = this.$refs.trix;
-        if (trix && trix.editor) trix.editor.loadHTML('');
+        if (this.quill) this.quill.root.innerHTML = '';
         this.message = 'Draft cleared.';
         setTimeout(() => { this.message = ''; }, 2500);
       }
@@ -627,7 +637,6 @@ const dashboardAppDefinition = () => ({
     insertStarterTemplate() {
       if (this.form.htmlBody && this.form.htmlBody.trim()) {
         if (!confirm('Replace current body with a starter template?')) return;
-
       }
       this.form.htmlBody = [
         '<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">',
@@ -636,16 +645,48 @@ const dashboardAppDefinition = () => ({
         '  <p style="margin: 0;">Best regards,<br>Your Team</p>',
         '</div>'
       ].join('\n');
+      this.form.textBody = 'Hello {{first_name}},\n\nThis is a quick update from our team.\n\nBest regards,\nYour Team';
       this.editorMode = 'visual';
+      if (this.quill) this.quill.root.innerHTML = this.form.htmlBody;
       this.persistDraft();
     },
 
-    loadTrixContent(html) {
-      const editor = this.$refs.trix;
-      if (editor && editor.editor) {
-        editor.editor.loadHTML(html || '');
-      } else {
-        setTimeout(() => this.loadTrixContent(html), 100);
+    initQuillEditor() {
+      const container = this.$refs.quill;
+      if (!container || this.quill) return;
+      if (!container.offsetParent) {
+        setTimeout(() => this.initQuillEditor(), 500);
+        return;
+      }
+      try {
+        this.quill = new Quill(container, {
+          theme: 'snow',
+          modules: {
+            toolbar: [
+              ['bold', 'italic', 'underline', 'strike'],
+              [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+              ['link'],
+              ['clean']
+            ]
+          }
+        });
+        this.quill.on('text-change', () => {
+          this.form.htmlBody = this.quill.root.innerHTML;
+          this.form.textBody = this.quill.getText();
+          this.persistDraft();
+        });
+        if (this.form.htmlBody) {
+          this.quill.root.innerHTML = this.form.htmlBody;
+        }
+      } catch (e) {
+        console.warn('Quill init failed:', e);
+      }
+    },
+
+    syncCurrentMode() {
+      if (this.editorMode === 'visual' && this.quill) {
+        this.form.htmlBody = this.quill.root.innerHTML;
+        this.form.textBody = this.quill.getText();
       }
     },
 
@@ -662,33 +703,23 @@ const dashboardAppDefinition = () => ({
     },
 
     setEditorMode(mode) {
-      if (mode === 'visual' && !this.form.htmlBody && this.form.textBody) {
+      this.syncCurrentMode();
+      const hasHtml = this.form.htmlBody && this.form.htmlBody.trim().length > 0;
+      const hasText = this.form.textBody && this.form.textBody.trim().length > 0;
+      if (mode === 'visual' && !hasHtml && hasText) {
         this.form.htmlBody = '<p>' + this.form.textBody.replace(/\n/g, '<br>') + '</p>';
       }
-      if (mode === 'html' && !this.form.htmlBody && this.form.textBody) {
+      if (mode === 'html' && !hasHtml && hasText) {
         this.form.htmlBody = '<p>' + this.form.textBody.replace(/\n/g, '<br>') + '</p>';
       }
-      if (mode === 'text' && !this.form.textBody && this.form.htmlBody) {
+      if (mode === 'text' && !hasText && hasHtml) {
         const d = document.createElement('div');
         d.innerHTML = this.form.htmlBody;
         this.form.textBody = d.textContent || d.innerText || '';
       }
       this.editorMode = mode;
-    },
-
-    onTrixInit() {
-      const editor = this.$refs.trix;
-      if (editor && editor.editor && this.form.htmlBody) {
-        editor.editor.loadHTML(this.form.htmlBody);
-      }
-    },
-
-    onTrixChange() {
-      const editor = this.$refs.trix;
-      if (editor && editor.editor && typeof editor.editor.getHTML === 'function') {
-        this.form.htmlBody = editor.editor.getHTML();
-        this.form.textBody = editor.editor.getDocument().toString();
-        this.persistDraft();
+      if (mode === 'visual' && this.quill && this.form.htmlBody) {
+        this.quill.root.innerHTML = this.form.htmlBody;
       }
     },
 
@@ -859,11 +890,13 @@ const dashboardAppDefinition = () => ({
         this.form.recipients = recipients;
         this.form.htmlBody = job.htmlBody || '';
         this.form.textBody = job.textBody || '';
+        this.form.cc = job.cc || '';
+        this.form.bcc = job.bcc || '';
         this.attachments = Array.isArray(job.attachments) ? job.attachments : [];
         this.editorMode = job.htmlBody && !job.textBody ? 'visual' : 'text';
         this.editingJobId = job.id;
         this.editingJobSubject = job.subject;
-        this.$nextTick(() => this.loadTrixContent(this.form.htmlBody));
+        this.$nextTick(() => { if (this.quill && this.form.htmlBody) this.quill.root.innerHTML = this.form.htmlBody; });
         this.persistDraft();
         this.saveAttachmentsDraft();
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -896,6 +929,8 @@ const dashboardAppDefinition = () => ({
           recipients: this.form.recipients,
           htmlBody: this.form.htmlBody || '',
           textBody: this.form.textBody || '',
+          cc: this.form.cc || '',
+          bcc: this.form.bcc || '',
           attachments: this.attachments
         };
         const response = await apiFetch(url, { method: this.editingJobId ? 'PUT' : 'POST', headers: this.headers(), body: JSON.stringify(body) });

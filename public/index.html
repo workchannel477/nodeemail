@@ -475,6 +475,17 @@
                     <p class="mt-1 text-xs text-[var(--muted)]">Commas, spaces, semicolons, or new lines.</p>
                   </div>
 
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label class="text-sm font-medium">CC <span class="text-xs text-[var(--muted)]">(optional)</span></label>
+                      <input type="text" x-model.trim="form.cc" @input.debounce.300ms="persistDraft" placeholder="cc@example.com" class="field mt-1" />
+                    </div>
+                    <div>
+                      <label class="text-sm font-medium">BCC <span class="text-xs text-[var(--muted)]">(optional)</span></label>
+                      <input type="text" x-model.trim="form.bcc" @input.debounce.300ms="persistDraft" placeholder="bcc@example.com" class="field mt-1" />
+                    </div>
+                  </div>
+
                   <div>
                     <div class="flex items-center justify-between text-sm mb-2">
                       <label class="font-medium">Email Body</label>

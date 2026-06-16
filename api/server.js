@@ -1154,6 +1154,8 @@ async function sendBatchWithResend(job, batch, config = {}) {
     if (att.url) return { filename: att.filename, path: att.url };
     return null;
   }).filter(Boolean);
+  const ccList = job.cc ? job.cc.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+  const bccList = job.bcc ? job.bcc.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
   const maxRequestsPerSecond = normalizeResendRequestsPerSecond(config.maxRequestsPerSecond || config.requestsPerSecond);
   const results = { sent: 0, failed: 0, errorDetails: [] };
 
@@ -1170,6 +1172,8 @@ async function sendBatchWithResend(job, batch, config = {}) {
           html: htmlBody || undefined,
           text: textBody || undefined,
           replyTo: job.replyTo || config.replyTo || undefined,
+          cc: ccList,
+          bcc: bccList,
           attachments: attachments.length ? attachments : undefined,
         });
         if (response?.error) {
@@ -1233,6 +1237,8 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
   let failed = 0;
   const errors = [];
   const errorDetails = [];
+  const ccList = job.cc || undefined;
+  const bccList = job.bcc || undefined;
   const attachments = normalizeJobAttachments(job).map((att) => {
     if (att.content) return { filename: att.filename, content: att.content, contentType: att.contentType };
     if (att.url) return { filename: att.filename, path: att.url, contentType: att.contentType };
@@ -1244,6 +1250,8 @@ async function sendBatchWithSmtp(job, batch, smtpServer, proxyUrl) {
         from: fromAddress,
         replyTo: replyToAddress,
         to: recipient,
+        cc: ccList,
+        bcc: bccList,
         subject: job.subject,
         text: job.textBody || (job.htmlBody ? stripHtml(job.htmlBody) : ""),
         html: job.htmlBody,
@@ -1820,6 +1828,7 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
   const {
     subject = "", fromName = "", from = "", replyTo = "", textBody = "", htmlBody = "",
     recipients, attachments = [], batchSize, delayBetweenBatches = 2, maxRetries = 3,
+    cc = "", bcc = "",
   } = req.body || {};
   if (!subject || !fromName) return res.status(400).json({ message: "fromName and subject are required" });
   const recipientListRaw = normalizeRecipients(recipients);
@@ -1839,6 +1848,8 @@ app.post("/api/jobs", requireAuth, async (req, res) => {
     batchSize: parseInt(batchSize || BATCH_SIZE_DEFAULT, 10),
     delayBetweenBatches: parseInt(delayBetweenBatches, 10),
     maxRetries: parseInt(maxRetries, 10),
+    cc: cc || undefined,
+    bcc: bcc || undefined,
     attachments: Array.isArray(attachments) ? attachments : [],
     status: "pending", transportHint: "resend", createdAt: now, updatedAt: now,
   };
@@ -1860,7 +1871,7 @@ app.get("/api/jobs/:id/recipients", requireAuth, async (req, res) => {
 
 app.put("/api/jobs/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { subject = "", fromName = "", replyTo = "", textBody = "", htmlBody = "", recipients, attachments, batchSize, delayBetweenBatches = 2, maxRetries = 3 } = req.body || {};
+  const { subject = "", fromName = "", replyTo = "", textBody = "", htmlBody = "", recipients, attachments, batchSize, delayBetweenBatches = 2, maxRetries = 3, cc = "", bcc = "" } = req.body || {};
   if (!subject || !fromName) return res.status(400).json({ message: "fromName and subject are required" });
   const job = await findJobById(id);
   if (!job) return res.status(404).json({ message: "Job not found" });
@@ -1874,6 +1885,8 @@ app.put("/api/jobs/:id", requireAuth, async (req, res) => {
   job.subject = subject;
   job.fromName = fromName;
   job.replyTo = replyTo || undefined;
+  job.cc = cc || undefined;
+  job.bcc = bcc || undefined;
   job.textBody = textBody;
   job.htmlBody = htmlBody;
   job.batchSize = parseInt(batchSize || job.batchSize || BATCH_SIZE_DEFAULT, 10);
