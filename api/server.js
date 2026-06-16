@@ -120,6 +120,7 @@ const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
 const mailProvidersFilePath = path.join(dataDir, "mail-providers.json");
 const activityLogPath = path.join(dataDir, "activity-log.json");
 const appSettingsPath = path.join(dataDir, "app-settings.json");
+const telegramDataPath = path.join(dataDir, "telegram.json");
 
 const recipientsDir = path.join(dataDir, "job-recipients");
 
@@ -233,6 +234,9 @@ async function ensureDataFiles() {
   }
   if (!(await fs.pathExists(appSettingsPath))) {
     await writeJsonFallback(appSettingsPath, { paymentDetails: '', telegramLink: '' });
+  }
+  if (!(await fs.pathExists(telegramDataPath))) {
+    await writeJsonFallback(telegramDataPath, { botToken: '', contacts: {}, messages: {} });
   }
 }
 
@@ -573,6 +577,155 @@ async function saveAppSettings(data) {
   } else {
     await writeJsonFallback(appSettingsPath, data);
   }
+}
+
+// ---------- Telegram Bot ----------
+
+let telegramPollInterval = null;
+let telegramBotToken = '';
+let telegramBotUsername = '';
+let telegramUpdateOffset = 0;
+
+async function loadTelegramData() {
+  if (db) {
+    const doc = await db.collection("config").doc("telegram").get();
+    return doc.exists ? doc.data() : { botToken: '', contacts: {}, messages: {} };
+  }
+  return readJsonFallback(telegramDataPath, { botToken: '', contacts: {}, messages: {} });
+}
+
+async function saveTelegramData(data) {
+  if (db) {
+    await db.collection("config").doc("telegram").set(data);
+  } else {
+    await writeJsonFallback(telegramDataPath, data);
+  }
+}
+
+async function startTelegramBot(token) {
+  stopTelegramBot();
+  telegramBotToken = token;
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.description || 'Invalid token');
+    telegramBotUsername = data.result.username;
+    telegramUpdateOffset = 0;
+    telegramPollInterval = setInterval(pollTelegramUpdates, 3000);
+    return { status: 'running', botUsername: telegramBotUsername };
+  } catch (err) {
+    telegramBotToken = '';
+    throw err;
+  }
+}
+
+function stopTelegramBot() {
+  if (telegramPollInterval) {
+    clearInterval(telegramPollInterval);
+    telegramPollInterval = null;
+  }
+  telegramBotToken = '';
+  telegramBotUsername = '';
+  telegramUpdateOffset = 0;
+}
+
+async function pollTelegramUpdates() {
+  if (!telegramBotToken) return;
+  try {
+    const url = `https://api.telegram.org/bot${telegramBotToken}/getUpdates?offset=${telegramUpdateOffset + 1}&timeout=10&allowed_updates=["message"]`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!data.ok) return;
+    let changed = false;
+    for (const update of data.result || []) {
+      const msg = update.message;
+      if (!msg) continue;
+      const chatId = String(msg.chat.id);
+      const contact = {
+        id: chatId,
+        firstName: msg.chat.first_name || '',
+        lastName: msg.chat.last_name || '',
+        username: msg.chat.username || '',
+        lastMessageAt: new Date(msg.date * 1000).toISOString(),
+        lastMessage: msg.text || msg.caption || '(media)',
+      };
+      const message = {
+        id: msg.message_id,
+        chatId,
+        text: msg.text || msg.caption || '',
+        direction: 'incoming',
+        timestamp: new Date(msg.date * 1000).toISOString(),
+        hasMedia: Boolean(msg.photo || msg.document || msg.video || msg.audio || msg.sticker),
+        mediaFileId: getTelegramMediaFileId(msg),
+        mediaType: getTelegramMediaType(msg),
+        caption: msg.caption || null,
+      };
+      const tgData = await loadTelegramData();
+      if (!tgData.contacts) tgData.contacts = {};
+      if (!tgData.messages) tgData.messages = {};
+      if (!tgData.contacts[chatId]) {
+        tgData.contacts[chatId] = { ...contact, unread: 0 };
+      } else {
+        Object.assign(tgData.contacts[chatId], contact);
+        tgData.contacts[chatId].unread = (tgData.contacts[chatId].unread || 0) + 1;
+      }
+      if (!tgData.messages[chatId]) tgData.messages[chatId] = [];
+      tgData.messages[chatId].push(message);
+      if (tgData.messages[chatId].length > 500) tgData.messages[chatId] = tgData.messages[chatId].slice(-500);
+      await saveTelegramData(tgData);
+      telegramUpdateOffset = update.update_id;
+      changed = true;
+    }
+  } catch (err) {
+    console.error('Telegram poll error:', err.message);
+  }
+}
+
+function getTelegramMediaFileId(msg) {
+  if (msg.photo) return msg.photo[msg.photo.length - 1].file_id;
+  if (msg.document) return msg.document.file_id;
+  if (msg.video) return msg.video.file_id;
+  if (msg.audio) return msg.audio.file_id;
+  if (msg.sticker) return msg.sticker.file_id;
+  return null;
+}
+
+function getTelegramMediaType(msg) {
+  if (msg.photo) return 'photo';
+  if (msg.document) return 'document';
+  if (msg.video) return 'video';
+  if (msg.audio) return 'audio';
+  if (msg.sticker) return 'sticker';
+  return null;
+}
+
+async function sendTelegramReply(chatId, text) {
+  if (!telegramBotToken) throw new Error('Bot not running');
+  const url = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: parseInt(chatId), text }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.description || 'Failed to send');
+  const message = {
+    id: data.result.message_id,
+    chatId,
+    text,
+    direction: 'outgoing',
+    timestamp: new Date().toISOString(),
+    hasMedia: false,
+    mediaFileId: null,
+    mediaType: null,
+    caption: null,
+  };
+  const tgData = await loadTelegramData();
+  if (!tgData.messages) tgData.messages = {};
+  if (!tgData.messages[chatId]) tgData.messages[chatId] = [];
+  tgData.messages[chatId].push(message);
+  await saveTelegramData(tgData);
+  return message;
 }
 
 // ---------- Credits ----------
@@ -2132,6 +2285,81 @@ app.post("/admin/providers/:id/reset-usage", requireAuth, requireAdmin, async (r
   }
 });
 
+// ---------- Telegram Admin Routes ----------
+
+app.get("/admin/telegram/bot", requireAuth, requireAdmin, async (_req, res) => {
+  const data = await loadTelegramData();
+  res.json({
+    status: telegramPollInterval ? 'running' : 'stopped',
+    botUsername: telegramBotUsername,
+    hasToken: Boolean(data.botToken),
+  });
+});
+
+app.post("/admin/telegram/bot", requireAuth, requireAdmin, async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ message: 'Bot token is required' });
+  try {
+    const result = await startTelegramBot(token);
+    const data = await loadTelegramData();
+    data.botToken = token;
+    await saveTelegramData(data);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+app.post("/admin/telegram/bot/stop", requireAuth, requireAdmin, async (_req, res) => {
+  stopTelegramBot();
+  const data = await loadTelegramData();
+  data.botToken = '';
+  await saveTelegramData(data);
+  res.json({ status: 'stopped' });
+});
+
+app.get("/admin/telegram/contacts", requireAuth, requireAdmin, async (_req, res) => {
+  const data = await loadTelegramData();
+  const contacts = Object.values(data.contacts || {})
+    .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+  res.json(contacts);
+});
+
+app.get("/admin/telegram/contacts/:id/messages", requireAuth, requireAdmin, async (req, res) => {
+  const data = await loadTelegramData();
+  const messages = (data.messages[req.params.id] || [])
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  if (data.contacts && data.contacts[req.params.id]) {
+    data.contacts[req.params.id].unread = 0;
+    await saveTelegramData(data);
+  }
+  res.json(messages);
+});
+
+app.post("/admin/telegram/send", requireAuth, requireAdmin, async (req, res) => {
+  const { chatId, text } = req.body;
+  if (!chatId || !text) return res.status(400).json({ message: 'chatId and text are required' });
+  try {
+    const result = await sendTelegramReply(String(chatId), text);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+app.get("/admin/telegram/media/:fileId", requireAuth, requireAdmin, async (req, res) => {
+  if (!telegramBotToken) return res.status(400).json({ message: 'Bot not running' });
+  try {
+    const fileResp = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getFile?file_id=${req.params.fileId}`);
+    const fileData = await fileResp.json();
+    if (!fileData.ok) throw new Error(fileData.description || 'File not found');
+    const fileUrl = `https://api.telegram.org/file/bot${telegramBotToken}/${fileData.result.file_path}`;
+    res.redirect(fileUrl);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 app.get("/healthz", async (_req, res) => {
   try {
     await ensureDataFiles();
@@ -2181,6 +2409,19 @@ app.get("/healthz", async (_req, res) => {
 // ---------- Static ----------
 app.use(express.static(staticDir));
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`API running on http://localhost:${PORT} (serving static from ${staticDir})`);
+  try {
+    const data = await loadTelegramData();
+    if (data.botToken) {
+      try {
+        await startTelegramBot(data.botToken);
+        console.log('Telegram bot auto-started as @' + telegramBotUsername);
+      } catch (err) {
+        console.warn('Telegram bot auto-start failed:', err.message);
+      }
+    }
+  } catch (err) {
+    // silent
+  }
 });

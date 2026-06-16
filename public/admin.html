@@ -542,6 +542,145 @@
               </div>
             </section>
 
+            <!-- Section: Telegram -->
+            <section x-show="currentSection === 'telegram'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-brand-telegram text-2xl text-sky-500"></i>
+                  <div>
+                    <h2 class="text-xl font-semibold text-gray-800">Telegram Support Chat</h2>
+                    <p class="text-sm text-gray-500">Reply to messages from users who contact your Telegram bot.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bot Config -->
+              <div class="bg-sky-50 rounded-lg p-4 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center gap-3" x-show="!telegramBusy">
+                  <template x-if="telegramBot.status === 'running'">
+                    <div class="flex items-center gap-3 flex-1">
+                      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-700">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Bot active
+                      </span>
+                      <span class="text-sm text-gray-600" x-text="'@' + telegramBot.botUsername"></span>
+                      <button @click="stopTelegramBot" class="text-sm text-rose-600 hover:text-rose-800 underline">Stop</button>
+                    </div>
+                  </template>
+                  <template x-if="telegramBot.status !== 'running'">
+                    <div class="flex items-center gap-3 flex-1">
+                      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                        <span class="w-2 h-2 rounded-full bg-gray-400 inline-block"></span> Bot stopped
+                      </span>
+                      <input type="password" x-model="telegramBotTokenInput" placeholder="Enter bot token" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                      <button @click="saveTelegramBot" :disabled="!telegramBotTokenInput" class="px-4 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 disabled:opacity-50">Start</button>
+                    </div>
+                  </template>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Create a bot via <a href="https://t.me/botfather" target="_blank" class="underline">@BotFather</a> and paste the token above.</p>
+              </div>
+
+              <!-- Chat area -->
+              <template x-if="telegramBot.status === 'running'">
+                <div class="grid md:grid-cols-3 gap-6" style="min-height: 400px;">
+                  <!-- Contact List -->
+                  <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <h3 class="text-sm font-semibold text-gray-700">Contacts</h3>
+                    </div>
+                    <div class="overflow-y-auto" style="max-height: 420px;">
+                      <template x-for="contact in telegramContacts" :key="contact.id">
+                        <button @click="selectTelegramContact(contact)" class="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition flex items-center gap-3"
+                          :class="{ 'bg-sky-50 border-l-4 border-l-sky-500': telegramActiveChat?.id === contact.id }">
+                          <div class="w-9 h-9 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-bold shrink-0">
+                            <span x-text="(contact.firstName || '?')[0].toUpperCase()"></span>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                              <span class="text-sm font-medium text-gray-800 truncate" x-text="contact.firstName + (contact.lastName ? ' ' + contact.lastName : '') || contact.username || contact.id"></span>
+                              <span class="text-xs text-gray-400 shrink-0" x-text="formatTelegramTime(contact.lastMessageAt)"></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <span class="text-xs text-gray-500 truncate" x-text="contact.lastMessage || ''"></span>
+                              <span x-show="contact.unread > 0" class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold" x-text="contact.unread"></span>
+                            </div>
+                          </div>
+                        </button>
+                      </template>
+                      <template x-if="!telegramContacts.length">
+                        <div class="text-center py-10 text-gray-400 text-sm">No contacts yet. Share your bot username with users.</div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Chat View -->
+                  <div class="md:col-span-2 border border-gray-200 rounded-lg flex flex-col">
+                    <template x-if="telegramActiveChat">
+                      <div class="flex flex-col h-full" style="min-height: 460px;">
+                        <!-- Chat Header -->
+                        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-3">
+                          <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-bold">
+                            <span x-text="(telegramActiveChat.firstName || '?')[0].toUpperCase()"></span>
+                          </div>
+                          <div>
+                            <span class="text-sm font-semibold text-gray-800" x-text="telegramActiveChat.firstName + (telegramActiveChat.lastName ? ' ' + telegramActiveChat.lastName : '') || telegramActiveChat.username || 'Unknown'"></span>
+                            <span class="text-xs text-gray-400 ml-2" x-show="telegramActiveChat.username" x-text="'@' + telegramActiveChat.username"></span>
+                          </div>
+                        </div>
+                        <!-- Messages -->
+                        <div class="flex-1 overflow-y-auto p-4 space-y-3" x-ref="telegramChat" style="max-height: 360px;">
+                          <template x-for="msg in telegramMessages" :key="msg.id">
+                            <div class="flex" :class="msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
+                              <div class="max-w-[80%] rounded-2xl px-4 py-2 text-sm"
+                                :class="msg.direction === 'outgoing' ? 'bg-sky-500 text-white rounded-br-md' : 'bg-gray-100 text-gray-800 rounded-bl-md'">
+                                <template x-if="msg.hasMedia && msg.mediaType">
+                                  <div class="mb-1">
+                                    <template x-if="msg.mediaType === 'photo'">
+                                      <img :src="'/admin/telegram/media/' + msg.mediaFileId" class="max-w-full rounded-lg cursor-pointer" @click="window.open('/admin/telegram/media/' + msg.mediaFileId, '_blank')" loading="lazy" />
+                                    </template>
+                                    <template x-if="msg.mediaType !== 'photo'">
+                                      <a :href="'/admin/telegram/media/' + msg.mediaFileId" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 text-sm underline">
+                                        <i class="ti ti-file"></i> <span x-text="msg.mediaType"></span>
+                                      </a>
+                                    </template>
+                                  </div>
+                                </template>
+                                <span x-text="msg.text"></span>
+                                <div class="text-[10px] mt-1 opacity-60" :class="msg.direction === 'outgoing' ? 'text-right' : 'text-left'" x-text="formatTelegramTime(msg.timestamp)"></div>
+                              </div>
+                            </div>
+                          </template>
+                          <template x-if="!telegramMessages.length">
+                            <div class="text-center py-10 text-gray-400 text-sm">No messages in this conversation.</div>
+                          </template>
+                        </div>
+                        <!-- Reply Input -->
+                        <div class="border-t border-gray-200 p-3">
+                          <div class="flex gap-2">
+                            <input type="text" x-model="telegramReplyText" @keydown.enter="sendTelegramReply" placeholder="Type a reply..." class="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" :disabled="telegramSending" />
+                            <button @click="sendTelegramReply" :disabled="!telegramReplyText.trim() || telegramSending" class="px-5 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 text-sm font-medium inline-flex items-center gap-1.5">
+                              <i class="ti ti-send" :class="{'animate-pulse': telegramSending}"></i> Send
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="!telegramActiveChat">
+                      <div class="flex items-center justify-center h-full text-gray-400 text-sm py-20">
+                        Select a contact to view messages
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <template x-if="telegramBot.status !== 'running'">
+                <div class="text-center py-16 text-gray-400">
+                  <i class="ti ti-brand-telegram text-5xl mb-4"></i>
+                  <p class="text-lg font-medium">Start your Telegram bot to enable chat support</p>
+                  <p class="text-sm mt-1">Enter a bot token above and click Start.</p>
+                </div>
+              </template>
+            </section>
+
             <!-- Message / Error -->
             <p class="text-center text-sm text-gray-500 mt-6" x-show="message" x-text="message"></p>
             <p class="text-center text-sm text-red-600 mt-2" x-show="error" x-text="error"></p>

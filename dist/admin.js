@@ -57,6 +57,14 @@ const adminAppDefinition = () => ({
     paymentSettingsBusy: false,
     currentSection: 'dashboard',
     mobileNavOpen: false,
+    telegramBot: { status: 'stopped', botUsername: '', hasToken: false },
+    telegramBotTokenInput: '',
+    telegramContacts: [],
+    telegramMessages: [],
+    telegramActiveChat: null,
+    telegramReplyText: '',
+    telegramSending: false,
+    telegramBusy: false,
     navItems: [
       { id: 'dashboard', label: 'Dashboard', icon: 'ti-dashboard' },
       { id: 'users', label: 'Users', icon: 'ti-users' },
@@ -68,6 +76,7 @@ const adminAppDefinition = () => ({
       { id: 'jobs', label: 'Jobs', icon: 'ti-mail' },
       { id: 'datasync', label: 'Data Sync', icon: 'ti-database' },
       { id: 'payment', label: 'Payment', icon: 'ti-credit-card' },
+      { id: 'telegram', label: 'Telegram', icon: 'ti-brand-telegram' },
     ],
 
     get currentSectionLabel() {
@@ -96,6 +105,7 @@ const adminAppDefinition = () => ({
         await this.loadMailProviders();
         await this.loadCreditData();
         await this.loadPaymentSettings();
+        await this.loadTelegramBot();
       }
     },
 
@@ -125,6 +135,7 @@ const adminAppDefinition = () => ({
         await this.loadMailProviders();
         await this.loadCreditData();
         await this.loadPaymentSettings();
+        await this.loadTelegramBot();
         this.message = 'Login successful!';
         setTimeout(() => this.message = '', 3000);
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
@@ -455,6 +466,107 @@ const adminAppDefinition = () => ({
       } finally {
         this.syncBusy = false;
       }
+    },
+
+    // ---------- Telegram ----------
+
+    async loadTelegramBot() {
+      try {
+        const response = await apiFetch('/admin/telegram/bot', { headers: this.headers() });
+        if (!response.ok) return;
+        this.telegramBot = await response.json();
+        if (this.telegramBot.status === 'running') {
+          await this.loadTelegramContacts();
+        }
+      } catch (err) { /* silent */ }
+    },
+
+    async saveTelegramBot() {
+      if (!this.telegramBotTokenInput) return;
+      this.telegramBusy = true;
+      try {
+        const response = await apiFetch('/admin/telegram/bot', {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({ token: this.telegramBotTokenInput })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to start bot');
+        this.telegramBot = data;
+        this.telegramBotTokenInput = '';
+        await this.loadTelegramContacts();
+      } catch (err) { this.error = err.message; }
+      finally { this.telegramBusy = false; }
+    },
+
+    async stopTelegramBot() {
+      this.telegramBusy = true;
+      try {
+        const response = await apiFetch('/admin/telegram/bot/stop', { method: 'POST', headers: this.headers() });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to stop bot');
+        this.telegramBot = { status: 'stopped', botUsername: '', hasToken: false };
+        this.telegramContacts = [];
+        this.telegramMessages = [];
+        this.telegramActiveChat = null;
+      } catch (err) { this.error = err.message; }
+      finally { this.telegramBusy = false; }
+    },
+
+    async loadTelegramContacts() {
+      try {
+        const response = await apiFetch('/admin/telegram/contacts', { headers: this.headers() });
+        if (!response.ok) return;
+        this.telegramContacts = await response.json();
+      } catch (err) { /* silent */ }
+    },
+
+    async selectTelegramContact(contact) {
+      this.telegramActiveChat = contact;
+      this.telegramMessages = [];
+      try {
+        const response = await apiFetch(`/admin/telegram/contacts/${contact.id}/messages`, { headers: this.headers() });
+        if (!response.ok) return;
+        this.telegramMessages = await response.json();
+        contact.unread = 0;
+        this.$nextTick(() => {
+          const el = this.$refs.telegramChat;
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      } catch (err) { /* silent */ }
+    },
+
+    async sendTelegramReply() {
+      if (!this.telegramReplyText.trim() || !this.telegramActiveChat) return;
+      this.telegramSending = true;
+      try {
+        const response = await apiFetch('/admin/telegram/send', {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({ chatId: this.telegramActiveChat.id, text: this.telegramReplyText.trim() })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to send');
+        this.telegramMessages.push(data);
+        this.telegramReplyText = '';
+        this.$nextTick(() => {
+          const el = this.$refs.telegramChat;
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      } catch (err) { this.error = err.message; }
+      finally { this.telegramSending = false; }
+    },
+
+    formatTelegramTime(ts) {
+      if (!ts) return '';
+      try {
+        const d = new Date(ts);
+        const now = new Date();
+        const diff = now - d;
+        if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (diff < 604800000) return d.toLocaleDateString([], { weekday: 'short' });
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      } catch (e) { return ts; }
     },
 
     formatDate(value) {
