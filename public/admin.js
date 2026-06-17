@@ -55,6 +55,7 @@ const adminAppDefinition = () => ({
     syncLog: [],
     paymentSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10 },
     paymentSettingsBusy: false,
+    paymentQuill: null,
     currentSection: 'dashboard',
     mobileNavOpen: false,
     telegramBot: { status: 'stopped', botUsername: '', hasToken: false },
@@ -99,6 +100,24 @@ const adminAppDefinition = () => ({
           return;
         }
 
+        const hash = location.hash.replace('#', '');
+        if (hash) {
+          const match = this.navItems.find(i => i.id === hash);
+          if (match) this.currentSection = hash;
+        }
+        this.$watch('currentSection', (val) => {
+          if (val && location.hash.replace('#', '') !== val) {
+            history.replaceState(null, '', '#' + val);
+          }
+        });
+        window.addEventListener('hashchange', () => {
+          const h = location.hash.replace('#', '');
+          if (h && this.currentSection !== h) {
+            const match = this.navItems.find(i => i.id === h);
+            if (match) this.currentSection = h;
+          }
+        });
+
         await this.fetchOverview();
         await this.loadIPRotation();
         await this.loadRateLimits();
@@ -107,6 +126,7 @@ const adminAppDefinition = () => ({
         await this.loadCreditData();
         await this.loadPaymentSettings();
         await this.loadTelegramBot();
+        this.$nextTick(() => this.initPaymentQuill());
       }
     },
 
@@ -137,6 +157,7 @@ const adminAppDefinition = () => ({
         await this.loadCreditData();
         await this.loadPaymentSettings();
         await this.loadTelegramBot();
+        this.$nextTick(() => this.initPaymentQuill());
         this.message = 'Login successful!';
         setTimeout(() => this.message = '', 3000);
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
@@ -416,14 +437,42 @@ const adminAppDefinition = () => ({
             telegramLink: data.telegramLink || '',
             tokenRate: data.tokenRate || 10,
           };
+          this.$nextTick(() => {
+            if (this.paymentQuill && this.paymentSettings.paymentDetails) {
+              this.paymentQuill.root.innerHTML = this.paymentSettings.paymentDetails;
+            }
+          });
         }
       } catch (error) { console.error('Failed to load payment settings:', error); }
+    },
+
+    initPaymentQuill() {
+      if (this.paymentQuill) return;
+      const container = this.$refs.paymentQuill;
+      if (!container) return;
+      try {
+        this.paymentQuill = new Quill(container, {
+          theme: 'snow',
+          modules: {
+            toolbar: [['bold', 'italic', 'underline', 'strike'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']]
+          }
+        });
+        this.paymentQuill.on('text-change', () => {
+          this.paymentSettings.paymentDetails = this.paymentQuill.root.innerHTML;
+        });
+        if (this.paymentSettings.paymentDetails) {
+          this.paymentQuill.root.innerHTML = this.paymentSettings.paymentDetails;
+        }
+      } catch (e) { console.warn('Payment Quill init failed:', e); }
     },
 
     async savePaymentSettings() {
       this.paymentSettingsBusy = true;
       this.error = '';
       try {
+        if (this.paymentQuill) {
+          this.paymentSettings.paymentDetails = this.paymentQuill.root.innerHTML;
+        }
         const response = await apiFetch('/admin/settings', {
           method: 'POST',
           headers: this.headers(),
@@ -586,8 +635,8 @@ const adminAppDefinition = () => ({
       return parts.join(' · ');
     },
 
-    redirectHome() { window.location.href = '/index.html'; },
-    openUserPanel() { window.location.href = '/index.html'; },
+    redirectHome() { window.location.href = '/'; },
+    openUserPanel() { window.location.href = '/'; },
   });
 
 // User App
@@ -608,7 +657,11 @@ const dashboardAppDefinition = () => ({
     recipientsBusy: false,
     jobSearch: '',
     statusFilter: 'all',
+    authMode: 'login',
     loginForm: { username: '', password: '' },
+    signupForm: { username: '', email: '', password: '' },
+    otpForm: { code: '' },
+    signupUsername: '',
     form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '', cc: '', bcc: '' },
     attachments: [],
     uploadingFile: false,
@@ -675,6 +728,24 @@ const dashboardAppDefinition = () => ({
 
     async init() {
       if (this.token) {
+        const hash = location.hash.replace('#', '');
+        if (hash) {
+          const match = this.navItems.find(i => i.id === hash);
+          if (match) this.currentSection = hash;
+        }
+        this.$watch('currentSection', (val) => {
+          if (val && location.hash.replace('#', '') !== val) {
+            history.replaceState(null, '', '#' + val);
+          }
+        });
+        window.addEventListener('hashchange', () => {
+          const h = location.hash.replace('#', '');
+          if (h && this.currentSection !== h) {
+            const match = this.navItems.find(i => i.id === h);
+            if (match) this.currentSection = h;
+          }
+        });
+
         await this.fetchJobs();
         await this.refreshProfile();
         this.loadDraft();
@@ -768,10 +839,6 @@ const dashboardAppDefinition = () => ({
     initQuillEditor() {
       const container = this.$refs.quill;
       if (!container || this.quill) return;
-      if (!container.offsetParent) {
-        setTimeout(() => this.initQuillEditor(), 500);
-        return;
-      }
       try {
         this.quill = new Quill(container, {
           theme: 'snow',
@@ -924,6 +991,49 @@ const dashboardAppDefinition = () => ({
         this.loadAttachmentsDraft();
         await this.loadActivity(true);
         this.loadTopUpSettings();
+      } catch (error) { this.error = error.message; } finally { this.busy = false; }
+    },
+
+    async signup() {
+      this.error = '';
+      this.busy = true;
+      try {
+        const response = await apiFetch('/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.signupForm) });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Signup failed'); }
+        this.signupUsername = this.signupForm.username.toLowerCase().trim();
+        this.otpForm.code = '';
+        this.authMode = 'verify';
+      } catch (error) { this.error = error.message; } finally { this.busy = false; }
+    },
+
+    async verifyOtp() {
+      this.error = '';
+      this.busy = true;
+      try {
+        const response = await apiFetch('/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: this.signupUsername, otp: this.otpForm.code }) });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Verification failed'); }
+        const data = await response.json();
+        if (data.status === 'suspended') throw new Error('Your account has been suspended.');
+        this.token = data.token;
+        this.user = { username: data.username, role: data.role, mailboxes: data.mailboxes || [], status: data.status };
+        this.userCredits = data.credits || 0;
+        this.creditsPerEmail = data.costPerEmail || 1;
+        localStorage.setItem('mailer_token', this.token);
+        localStorage.setItem('mailer_user', JSON.stringify(this.user));
+        await this.fetchJobs();
+        this.loadDraft();
+        this.loadAttachmentsDraft();
+        await this.loadActivity(true);
+        this.loadTopUpSettings();
+      } catch (error) { this.error = error.message; } finally { this.busy = false; }
+    },
+
+    async resendOtp() {
+      this.error = '';
+      this.busy = true;
+      try {
+        const response = await apiFetch('/auth/resend-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: this.signupUsername }) });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Failed to resend OTP'); }
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
     },
 
@@ -1098,7 +1208,31 @@ const dashboardAppDefinition = () => ({
       return parts.join(' · ');
     },
 
-    openAdmin() { window.location.href = '/admin.html'; }
+    openAdmin() { window.location.href = '/admin.html'; },
+
+    copyToClipboard(text, event) {
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event?.currentTarget || event?.target;
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<i class="ti ti-check text-green-500"></i>';
+          setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        }
+      }).catch(() => {});
+    },
+
+    formatPaymentHtml(text) {
+      if (!text) return '';
+      const isHtml = /<[a-z][\s\S]*>/i.test(text);
+      let html = isHtml ? text : text.replace(/\n/g, '<br>');
+      // Auto-detect and wrap crypto addresses with copy buttons
+      const addressPattern = /(0x[a-fA-F0-9]{40})|([13][a-km-zA-HJ-NP-Z1-9]{25,34})|(bc1[a-zA-HJ-NP-Z0-9]{25,62})|(ltc1[a-zA-HJ-NP-Z0-9]{25,62})/g;
+      html = html.replace(addressPattern, (match) => {
+        return `<span class="inline-flex items-center gap-1 bg-gray-100 rounded px-1.5 py-0.5 font-mono text-xs">${match}<button onclick="navigator.clipboard.writeText('${match}');this.innerHTML='✓';setTimeout(()=>this.innerHTML='⎘',2000)" class="text-teal-600 hover:text-teal-700 ml-0.5" title="Copy address">⎘</button></span>`;
+      });
+      return html;
+    }
 
   });
 

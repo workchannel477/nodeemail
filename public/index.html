@@ -323,9 +323,11 @@
                 <i class="ti ti-mail-forward text-2xl text-teal-600"></i>
               </div>
               <h1 class="mt-3 text-2xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
-              <p class="mt-1 text-sm text-[var(--muted)]">Sign in to your account</p>
+              <p class="mt-1 text-sm text-[var(--muted)]" x-text="authMode === 'login' ? 'Sign in to your account' : authMode === 'signup' ? 'Create a new account' : 'Verify your email'"></p>
             </div>
-            <section class="surface p-6 md:p-8 lg:col-span-5 reveal">
+
+            <!-- Login Form -->
+            <section x-show="authMode === 'login'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
               <h2 class="text-xl font-bold text-[var(--ink)]">Sign in</h2>
               <p class="text-sm text-[var(--muted)] mt-1">Use your workspace account.</p>
               <form class="mt-5 space-y-4" @submit.prevent="login">
@@ -343,7 +345,61 @@
                 </button>
                 <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
               </form>
-          </section>
+              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+                Don't have an account?
+                <a href="#" @click.prevent="authMode = 'signup'; error = ''" class="text-teal-600 font-medium">Sign up</a>
+              </p>
+            </section>
+
+            <!-- Signup Form -->
+            <section x-show="authMode === 'signup'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Create Account</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Register for a new workspace account.</p>
+              <form class="mt-5 space-y-4" @submit.prevent="signup">
+                <div>
+                  <label class="text-sm font-medium">Username</label>
+                  <input type="text" x-model.trim="signupForm.username" class="field mt-1" required minlength="3" />
+                </div>
+                <div>
+                  <label class="text-sm font-medium">Email</label>
+                  <input type="email" x-model.trim="signupForm.email" class="field mt-1" required />
+                </div>
+                <div>
+                  <label class="text-sm font-medium">Password</label>
+                  <input type="password" x-model.trim="signupForm.password" class="field mt-1" required minlength="4" />
+                </div>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-user-plus mr-1"></i> Sign up</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Registering...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+              </form>
+              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+                Already have an account?
+                <a href="#" @click.prevent="authMode = 'login'; error = ''" class="text-teal-600 font-medium">Sign in</a>
+              </p>
+            </section>
+
+            <!-- OTP Verification -->
+            <section x-show="authMode === 'verify'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Verify Your Email</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Enter the 6-digit code sent to <span class="font-semibold" x-text="signupForm.email"></span></p>
+              <form class="mt-5 space-y-4" @submit.prevent="verifyOtp">
+                <div>
+                  <label class="text-sm font-medium">OTP Code</label>
+                  <input type="text" x-model.trim="otpForm.code" class="field mt-1" required maxlength="6" placeholder="000000" />
+                </div>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-checks mr-1"></i> Verify &amp; Sign in</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Verifying...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+              </form>
+              <p class="mt-3 text-xs text-center text-[var(--muted)]">
+                Didn't receive the code?
+                <a href="#" @click.prevent="resendOtp" class="text-teal-600 font-medium">Resend</a>
+              </p>
+            </section>
         </div>
       </template>
 
@@ -724,8 +780,13 @@
               <i class="ti ti-coins text-3xl text-teal-500"></i>
             </div>
             <div class="surface-soft p-4">
-              <p class="text-sm font-semibold text-[var(--ink)] mb-2">Payment Details</p>
-              <p class="text-sm text-[var(--muted)] whitespace-pre-wrap" x-text="topUpSettings.paymentDetails || 'No payment details configured yet. Contact support.'"></p>
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <p class="text-sm font-semibold text-[var(--ink)]">Payment Details</p>
+                <button @click="copyToClipboard(topUpSettings.paymentDetails, $event)" :disabled="!topUpSettings.paymentDetails" class="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1 shrink-0" title="Copy payment details">
+                  <i class="ti ti-copy"></i> Copy
+                </button>
+              </div>
+              <div class="text-sm text-[var(--muted)] prose prose-sm max-w-none" x-html="topUpSettings.paymentDetails ? formatPaymentHtml(topUpSettings.paymentDetails) : '<p>No payment details configured yet. Contact support.</p>'"></div>
             </div>
             <div x-show="topUpSettings.telegramLink" class="surface-soft p-4 flex items-center gap-3">
               <i class="ti ti-brand-telegram text-2xl text-sky-500"></i>

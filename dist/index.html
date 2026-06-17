@@ -18,11 +18,8 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
     />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/trix@2.0.10/dist/trix.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/trix@2.0.8/dist/trix.css">
-    <script src="https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
     <style>
       .reveal { animation: rise 0.4s ease both; }
 
@@ -30,24 +27,9 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      trix-editor {
-        min-height: 200px;
-        border-radius: 10px;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.92);
-      }
-      trix-editor:focus {
-        border-color: rgba(15, 118, 110, 0.6);
-        box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.13);
-      }
-      trix-toolbar .trix-button-group {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-      }
-      trix-toolbar .trix-button--icon {
-        width: 1.8em;
-        height: 1.8em;
-      }
+      #quill-editor { min-height: 230px; }
+      .ql-container { min-height: 180px; font-size: 0.95rem; }
+      .ql-editor { min-height: 180px; }
 
       .upload-zone {
         border: 2px dashed var(--line);
@@ -154,7 +136,7 @@
         .main-area { margin-left: 0; padding-top: 54px; }
         .mobile-header { display: flex; }
       }
-    </style>
+      
       :root {
         --bg: #f4f8f7;
         --bg-alt: #e9f1ef;
@@ -169,10 +151,7 @@
         font-family: "Work Sans", sans-serif;
       }
 
-      h1,
-      h2,
-      h3,
-      .font-title {
+      h1, h2, h3, .font-title {
         font-family: "Sora", sans-serif;
       }
 
@@ -192,22 +171,16 @@
         z-index: 0;
         opacity: 0.45;
       }
-
       .ambient-shape.one {
-        width: 220px;
-        height: 220px;
+        width: 220px; height: 220px;
         background: rgba(15, 118, 110, 0.25);
-        left: -50px;
-        top: 130px;
+        left: -50px; top: 130px;
         animation: float 10s ease-in-out infinite;
       }
-
       .ambient-shape.two {
-        width: 280px;
-        height: 280px;
+        width: 280px; height: 280px;
         background: rgba(224, 122, 45, 0.2);
-        right: -60px;
-        top: 380px;
+        right: -60px; top: 380px;
         animation: float 12s ease-in-out infinite reverse;
       }
 
@@ -215,44 +188,14 @@
         background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 22px;
-      * { font-family: "Inter", "Work Sans", sans-serif; }
-
-      body {
-        background: var(--bg-alt);
-        color: var(--ink);
-      }
-
-      .surface {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 16px;
         backdrop-filter: blur(14px);
         box-shadow: 0 18px 40px rgba(18, 32, 29, 0.08);
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
       }
 
       .surface-soft {
         background: rgba(255, 255, 255, 0.72);
         border: 1px solid var(--line);
         border-radius: 18px;
-      }
-
-      .btn-primary {
-        background: linear-gradient(135deg, var(--accent), #115e59);
-        color: #fff;
-        border-radius: 12px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-      }
-
-      .btn-primary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 24px rgba(15, 118, 110, 0.3);
-        border-radius: 12px;
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
       }
 
       .btn-primary {
@@ -270,14 +213,13 @@
         background: #fff;
         border: 1px solid var(--line);
         color: var(--ink);
-        border-radius: 12px;
         border-radius: 10px;
       }
 
       .field {
         width: 100%;
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: 10px;
         background: rgba(255, 255, 255, 0.92);
         padding: 0.65rem 0.8rem;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -291,35 +233,26 @@
       .pill {
         border-radius: 999px;
         border: 1px solid var(--line);
-        padding: 0.38rem 0.8rem;
         padding: 0.3rem 0.8rem;
         font-size: 0.77rem;
         font-weight: 600;
         letter-spacing: 0.02em;
       }
+
+      .editor-visible { display: block; }
+      .editor-hidden { display: none !important; }
       .reveal {
         animation: rise 0.5s ease both;
       }
 
       @keyframes rise {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       @keyframes float {
-        0%,
-        100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-14px);
-        }
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-14px); }
       }
     </style>
   </head>
@@ -390,9 +323,11 @@
                 <i class="ti ti-mail-forward text-2xl text-teal-600"></i>
               </div>
               <h1 class="mt-3 text-2xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
-              <p class="mt-1 text-sm text-[var(--muted)]">Sign in to your account</p>
+              <p class="mt-1 text-sm text-[var(--muted)]" x-text="authMode === 'login' ? 'Sign in to your account' : authMode === 'signup' ? 'Create a new account' : 'Verify your email'"></p>
             </div>
-            <section class="surface p-6 md:p-8 lg:col-span-5 reveal">
+
+            <!-- Login Form -->
+            <section x-show="authMode === 'login'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
               <h2 class="text-xl font-bold text-[var(--ink)]">Sign in</h2>
               <p class="text-sm text-[var(--muted)] mt-1">Use your workspace account.</p>
               <form class="mt-5 space-y-4" @submit.prevent="login">
@@ -410,19 +345,64 @@
                 </button>
                 <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
               </form>
-          </section>
+              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+                Don't have an account?
+                <a href="#" @click.prevent="authMode = 'signup'; error = ''" class="text-teal-600 font-medium">Sign up</a>
+              </p>
+            </section>
+
+            <!-- Signup Form -->
+            <section x-show="authMode === 'signup'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Create Account</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Register for a new workspace account.</p>
+              <form class="mt-5 space-y-4" @submit.prevent="signup">
+                <div>
+                  <label class="text-sm font-medium">Username</label>
+                  <input type="text" x-model.trim="signupForm.username" class="field mt-1" required minlength="3" />
+                </div>
+                <div>
+                  <label class="text-sm font-medium">Email</label>
+                  <input type="email" x-model.trim="signupForm.email" class="field mt-1" required />
+                </div>
+                <div>
+                  <label class="text-sm font-medium">Password</label>
+                  <input type="password" x-model.trim="signupForm.password" class="field mt-1" required minlength="4" />
+                </div>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-user-plus mr-1"></i> Sign up</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Registering...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+              </form>
+              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+                Already have an account?
+                <a href="#" @click.prevent="authMode = 'login'; error = ''" class="text-teal-600 font-medium">Sign in</a>
+              </p>
+            </section>
+
+            <!-- OTP Verification -->
+            <section x-show="authMode === 'verify'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Verify Your Email</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Enter the 6-digit code sent to <span class="font-semibold" x-text="signupForm.email"></span></p>
+              <form class="mt-5 space-y-4" @submit.prevent="verifyOtp">
+                <div>
+                  <label class="text-sm font-medium">OTP Code</label>
+                  <input type="text" x-model.trim="otpForm.code" class="field mt-1" required maxlength="6" placeholder="000000" />
+                </div>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-checks mr-1"></i> Verify &amp; Sign in</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Verifying...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+              </form>
+              <p class="mt-3 text-xs text-center text-[var(--muted)]">
+                Didn't receive the code?
+                <a href="#" @click.prevent="resendOtp" class="text-teal-600 font-medium">Resend</a>
+              </p>
+            </section>
         </div>
       </template>
 
-        <template x-if="token">
-          <section class="grid gap-6 lg:grid-cols-12">
-            <div class="space-y-6 lg:col-span-5">
-              <article class="surface reveal p-6">
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 class="font-title text-xl font-semibold">Compose Job</h2>
-              <article class="surface p-5 md:p-6 reveal">
-      <!-- Authenticated content -->
       <template x-if="token">
         <div class="main-area">
           <div class="max-w-5xl mx-auto p-4 lg:p-6 space-y-6">
@@ -551,6 +531,17 @@
                     <p class="mt-1 text-xs text-[var(--muted)]">Commas, spaces, semicolons, or new lines.</p>
                   </div>
 
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label class="text-sm font-medium">CC <span class="text-xs text-[var(--muted)]">(optional)</span></label>
+                      <input type="text" x-model.trim="form.cc" @input.debounce.300ms="persistDraft" placeholder="cc@example.com" class="field mt-1" />
+                    </div>
+                    <div>
+                      <label class="text-sm font-medium">BCC <span class="text-xs text-[var(--muted)]">(optional)</span></label>
+                      <input type="text" x-model.trim="form.bcc" @input.debounce.300ms="persistDraft" placeholder="bcc@example.com" class="field mt-1" />
+                    </div>
+                  </div>
+
                   <div>
                     <div class="flex items-center justify-between text-sm mb-2">
                       <label class="font-medium">Email Body</label>
@@ -560,15 +551,13 @@
                         <button type="button" class="tab-btn" :class="{ 'active': editorMode === 'text' }" @click="setEditorMode('text')">Text</button>
                       </div>
                     </div>
-                    <template x-if="editorMode === 'visual'">
-                      <div>
-                        <trix-editor x-ref="trix" @trix-change="onTrixChange" @trix-initialize="onTrixInit" class="trix-editor"></trix-editor>
-                      </div>
-                    </template>
-                    <div x-show="editorMode === 'html'">
+                    <div :class="editorMode === 'visual' ? 'editor-visible' : 'editor-hidden'">
+                      <div id="quill-editor" x-ref="quill"></div>
+                    </div>
+                    <div :class="editorMode === 'html' ? 'editor-visible' : 'editor-hidden'">
                       <textarea rows="12" x-model="form.htmlBody" @input="onHtmlInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="<html>...</html>"></textarea>
                     </div>
-                    <div x-show="editorMode === 'text'">
+                    <div :class="editorMode === 'text' ? 'editor-visible' : 'editor-hidden'">
                       <textarea rows="12" x-model="form.textBody" @input="onTextInput" class="field mt-1 font-mono text-sm" style="min-height:230px" placeholder="Plain text content"></textarea>
                     </div>
                     <div class="flex gap-2 mt-2">
@@ -636,25 +625,6 @@
               </article>
             </section>
 
-            <div class="space-y-6 lg:col-span-7">
-              <article class="surface reveal p-6">
-                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Total</p>
-                    <p class="font-title text-xl font-semibold" x-text="jobStats.total"></p>
-                  </div>
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Pending</p>
-                    <p class="font-title text-xl font-semibold text-amber-700" x-text="jobStats.pending"></p>
-                  </div>
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Sent</p>
-                    <p class="font-title text-xl font-semibold text-emerald-700" x-text="jobStats.sent"></p>
-                  </div>
-                  <div class="surface-soft p-3">
-                    <p class="text-[11px] uppercase tracking-wide text-[var(--muted)]">Failed</p>
-                    <p class="font-title text-xl font-semibold text-rose-700" x-text="jobStats.failed"></p>
-              <article class="surface p-5 md:p-6 reveal">
             <!-- Section: Jobs -->
             <section x-show="currentSection === 'jobs'" class="space-y-6">
               <article class="surface p-5 md:p-6">
@@ -711,12 +681,6 @@
                       <div class="surface-soft p-5 text-sm text-[var(--muted)]">
                         No matching jobs. Try changing filters or create a new job from the composer.
                       </div>
-                      <p x-text="`${filteredJobs.length} matching`"></p>
-                      <button class="text-teal-700 underline" @click="fetchJobs">Reload</button>
-                    </div>
-
-                    <template x-if="!filteredJobs.length">
-                      <div class="surface-soft p-5 text-sm text-[var(--muted)]">No matching jobs.</div>
                     </template>
 
                     <div class="space-y-3" x-show="filteredJobs.length">
@@ -816,8 +780,13 @@
               <i class="ti ti-coins text-3xl text-teal-500"></i>
             </div>
             <div class="surface-soft p-4">
-              <p class="text-sm font-semibold text-[var(--ink)] mb-2">Payment Details</p>
-              <p class="text-sm text-[var(--muted)] whitespace-pre-wrap" x-text="topUpSettings.paymentDetails || 'No payment details configured yet. Contact support.'"></p>
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <p class="text-sm font-semibold text-[var(--ink)]">Payment Details</p>
+                <button @click="copyToClipboard(topUpSettings.paymentDetails, $event)" :disabled="!topUpSettings.paymentDetails" class="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1 shrink-0" title="Copy payment details">
+                  <i class="ti ti-copy"></i> Copy
+                </button>
+              </div>
+              <div class="text-sm text-[var(--muted)] prose prose-sm max-w-none" x-html="topUpSettings.paymentDetails ? formatPaymentHtml(topUpSettings.paymentDetails) : '<p>No payment details configured yet. Contact support.</p>'"></div>
             </div>
             <div x-show="topUpSettings.telegramLink" class="surface-soft p-4 flex items-center gap-3">
               <i class="ti ti-brand-telegram text-2xl text-sky-500"></i>

@@ -1610,6 +1610,122 @@ app.get("/auth/me", requireAuth, async (req, res) => {
   res.json({ username: user.username, role: user.role || "user", mailboxes: user.mailboxes || [], status: user.status || "active", credits: user.credits || 0, creditsUsed: user.creditsUsed || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {} });
 });
 
+// ---------- Signup / OTP ----------
+
+const otps = new Map();
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function storeOtp(username, otp) {
+  otps.set(username, { otp, expiresAt: Date.now() + 600000 });
+}
+
+function verifyOtp(username, otp) {
+  const record = otps.get(username);
+  if (!record) return false;
+  if (Date.now() > record.expiresAt) { otps.delete(username); return false; }
+  if (record.otp !== otp) return false;
+  otps.delete(username);
+  return true;
+}
+
+// Clean expired OTPs every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of otps) {
+    if (val.expiresAt < now) otps.delete(key);
+  }
+}, 300000);
+
+app.post("/auth/signup", async (req, res) => {
+  const { username = "", password = "", email = "" } = req.body || {};
+  const usernameValue = String(username).trim().toLowerCase();
+  const emailValue = String(email).trim().toLowerCase();
+  if (!usernameValue || !password) return res.status(400).json({ message: "Username and password are required" });
+  if (!emailValue) return res.status(400).json({ message: "Email is required" });
+  if (password.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters" });
+  if (!/^[a-z0-9_]{3,30}$/.test(usernameValue)) return res.status(400).json({ message: "Username must be 3-30 characters (letters, numbers, underscores)" });
+  const existing = await findUserByUsername(usernameValue);
+  if (existing) return res.status(409).json({ message: "Username already exists" });
+  const salt = cryptoSalt();
+  const now = new Date().toISOString();
+  const newUser = {
+    id: uuid(), username: usernameValue, email: emailValue,
+    passwordHash: hashPassword(password, salt), salt,
+    role: "user", status: "pending",
+    mailboxes: [], credits: 0, creditsUsed: 0,
+    costPerEmail: DEFAULT_COST_PER_EMAIL,
+    features: { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 },
+    createdAt: now, updatedAt: now,
+  };
+  if (db) {
+    await db.collection("users").doc(newUser.id).set(newUser);
+  } else {
+    const store = await readJsonFallback(authFilePath, { users: [] });
+    store.users.push(newUser);
+    await writeJsonFallback(authFilePath, store);
+  }
+  const otp = generateOtp();
+  storeOtp(usernameValue, otp);
+  console.log(`OTP for ${usernameValue}: ${otp}`);
+  try {
+    const smtpServers = await loadSmtpPool();
+    if (smtpServers.servers?.length) {
+      const srv = smtpServers.servers[0];
+      const transporter = nodemailer.createTransport({
+        host: srv.host, port: parseInt(srv.port || "587", 10),
+        secure: parseInt(srv.port || "587", 10) === 465,
+        auth: { user: srv.username, pass: srv.password },
+      });
+      await transporter.sendMail({
+        from: srv.from || srv.username,
+        to: emailValue,
+        subject: "Your activation code",
+        html: `<p>Your activation code is: <b>${otp}</b></p><p>This code expires in 10 minutes.</p>`,
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to send OTP email:", err.message);
+  }
+  res.json({ message: "Account created. Check your email for the activation code.", otp });
+});
+
+app.post("/auth/verify-otp", async (req, res) => {
+  const { username = "", otp = "" } = req.body || {};
+  if (!username || !otp) return res.status(400).json({ message: "Username and OTP are required" });
+  if (!verifyOtp(username.toLowerCase().trim(), otp)) return res.status(400).json({ message: "Invalid or expired OTP" });
+  const user = await findUserByUsername(username.toLowerCase().trim());
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (user.status !== "pending") return res.status(400).json({ message: "Account already activated" });
+  user.status = "active";
+  user.updatedAt = new Date().toISOString();
+  if (db) {
+    await db.collection("users").doc(user.id).set(user);
+  } else {
+    const store = await readJsonFallback(authFilePath, { users: [] });
+    const idx = store.users.findIndex((u) => u.username === user.username);
+    if (idx !== -1) store.users[idx] = user;
+    await writeJsonFallback(authFilePath, store);
+  }
+  const token = uuid();
+  sessions.set(token, { token, username: user.username, role: user.role || "user", id: user.id, expiresAt: Date.now() + SESSION_TIMEOUT_SECONDS * 1000 });
+  res.json({ token, username: user.username, role: user.role || "user", status: user.status, credits: user.credits || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {} });
+});
+
+app.post("/auth/resend-otp", async (req, res) => {
+  const { username = "" } = req.body || {};
+  if (!username) return res.status(400).json({ message: "Username is required" });
+  const user = await findUserByUsername(username.toLowerCase().trim());
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (user.status !== "pending") return res.status(400).json({ message: "Account already activated" });
+  const otp = generateOtp();
+  storeOtp(username.toLowerCase().trim(), otp);
+  console.log(`OTP for ${username}: ${otp}`);
+  res.json({ message: "OTP resent", otp });
+});
+
 // ---------- Admin: Users ----------
 
 app.get("/admin/users", requireAuth, requireAdmin, async (_req, res) => {
@@ -2425,8 +2541,9 @@ app.get("/healthz", async (_req, res) => {
   }
 });
 
-// ---------- Static ----------
+// ---------- Static / Clean URLs ----------
 app.use(express.static(staticDir));
+app.get('/admin', (_req, res) => res.sendFile(path.join(staticDir, 'admin.html')));
 
 app.listen(PORT, async () => {
   console.log(`API running on http://localhost:${PORT} (serving static from ${staticDir})`);
