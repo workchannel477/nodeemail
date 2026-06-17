@@ -51,6 +51,7 @@ const adminAppDefinition = () => ({
     message: '',
     isReady: false,
     dataLoading: false,
+    sectionLoading: false,
     appLogs: [],
     log(level) {
       if (typeof console[level] === 'function') console[level].apply(console, Array.from(arguments).slice(1));
@@ -126,6 +127,7 @@ const adminAppDefinition = () => ({
           if (val && location.hash.replace('#', '') !== val) {
             history.replaceState(null, '', '#' + val);
           }
+          this.handleSectionChange(val);
         });
         window.addEventListener('hashchange', () => {
           const h = location.hash.replace('#', '');
@@ -144,8 +146,8 @@ const adminAppDefinition = () => ({
         await this.loadCreditData();
         await this.loadPaymentSettings();
         await this.loadTelegramBot();
-        this.$nextTick(() => this.initPaymentQuill());
         this.dataLoading = false;
+        this.$nextTick(() => this.handleSectionChange(this.currentSection));
       }
     },
 
@@ -667,6 +669,14 @@ const adminAppDefinition = () => ({
         const response = await apiFetch('/api/logs', { method: 'DELETE', headers: this.headers() });
         if (response.ok) { this.appLogs = []; this.message = 'Logs cleared'; setTimeout(() => this.message = '', 3000); }
       } catch (err) { this.log('error', 'Failed to clear logs:', err); }
+    },
+
+    async handleSectionChange(section) {
+      this.sectionLoading = true;
+      await this.$nextTick();
+      if (section === 'payment') this.initPaymentQuill();
+      if (section === 'logs') await this.loadLogs();
+      this.sectionLoading = false;
     },
 
     redirectHome() { window.location.href = '/dashboard'; },

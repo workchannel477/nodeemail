@@ -157,6 +157,15 @@
             </div>
 
             <div x-show="!dataLoading">
+              <!-- Section loading indicator -->
+              <div x-show="sectionLoading" class="flex items-center justify-center py-32">
+                <div class="text-center">
+                  <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-teal-500"></div>
+                  <p class="mt-3 text-gray-500 text-sm">Loading section...</p>
+                </div>
+              </div>
+
+              <div x-show="!sectionLoading">
             <!-- Section: Dashboard -->
             <section x-show="currentSection === 'dashboard'" class="bg-white shadow rounded-xl p-6 card-wrap">
               <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -712,6 +721,7 @@
                 </template>
               </div>
             </section>
+            </div> <!-- !sectionLoading -->
             </div> <!-- !dataLoading -->
 
             <!-- Message / Error -->
