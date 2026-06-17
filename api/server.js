@@ -324,7 +324,7 @@ function sanitizeUserForResponse(user = {}) {
     creditsUsed: user.creditsUsed || 0,
     costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL,
     features: user.features || { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 },
-
+    freeTrialUsed: user.freeTrialUsed !== false,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -774,16 +774,18 @@ async function getUserCredits(username) {
         credits: user.credits || 0,
         creditsUsed: user.creditsUsed || 0,
         costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL,
+        freeTrialUsed: user.freeTrialUsed !== false,
       };
     }
   }
   const payload = await readJsonFallback(authFilePath, { users: [] });
   const user = payload.users.find((u) => u.username === username);
-  if (!user) return { credits: 0, creditsUsed: 0, costPerEmail: DEFAULT_COST_PER_EMAIL };
+  if (!user) return { credits: 0, creditsUsed: 0, costPerEmail: DEFAULT_COST_PER_EMAIL, freeTrialUsed: true };
   return {
     credits: user.credits || 0,
     creditsUsed: user.creditsUsed || 0,
     costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL,
+    freeTrialUsed: user.freeTrialUsed !== false,
   };
 }
 
@@ -1551,6 +1553,11 @@ async function dispatchJob(job, payload, { skipRateLimit = false } = {}) {
     err.statusCode = 402;
     throw err;
   }
+  // Mark free trial as used on first successful send
+  if (!userCredits.freeTrialUsed) {
+    const user = await findUserByUsername(job.owner);
+    if (user) await updateUserInDb(user.id, { freeTrialUsed: true, updatedAt: new Date().toISOString() });
+  }
 
   try {
     const result = await sendEmailJob(job);
@@ -1595,7 +1602,7 @@ app.post("/auth/login", async (req, res) => {
   if ((user.status || "active") === "suspended") return res.status(403).json({ message: "Account suspended" });
   const token = uuid();
   sessions.set(token, { token, username: user.username, role: user.role || "user", id: user.id, expiresAt: Date.now() + SESSION_TIMEOUT_SECONDS * 1000 });
-  res.json({ token, username: user.username, role: user.role || "user", mailboxes: user.mailboxes || [], status: user.status || "active", credits: user.credits || 0, creditsUsed: user.creditsUsed || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {} });
+  res.json({ token, username: user.username, role: user.role || "user", mailboxes: user.mailboxes || [], status: user.status || "active", credits: user.credits || 0, creditsUsed: user.creditsUsed || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {}, freeTrialUsed: user.freeTrialUsed !== false });
 
 });
 
@@ -1608,7 +1615,7 @@ app.post("/auth/logout", requireAuth, (req, res) => {
 app.get("/auth/me", requireAuth, async (req, res) => {
   const user = await findUserByUsername(req.user.username);
   if (!user) return res.status(404).json({ message: "User not found" });
-  res.json({ username: user.username, role: user.role || "user", mailboxes: user.mailboxes || [], status: user.status || "active", credits: user.credits || 0, creditsUsed: user.creditsUsed || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {} });
+  res.json({ username: user.username, role: user.role || "user", mailboxes: user.mailboxes || [], status: user.status || "active", credits: user.credits || 0, creditsUsed: user.creditsUsed || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {}, freeTrialUsed: user.freeTrialUsed !== false });
 });
 
 // ---------- Signup / OTP ----------
@@ -1656,9 +1663,10 @@ app.post("/auth/signup", async (req, res) => {
     id: uuid(), username: usernameValue, email: emailValue,
     passwordHash: hashPassword(password, salt), salt,
     role: "user", status: "pending",
-    mailboxes: [], credits: 0, creditsUsed: 0,
+    mailboxes: [], credits: DEFAULT_COST_PER_EMAIL, creditsUsed: 0,
     costPerEmail: DEFAULT_COST_PER_EMAIL,
     features: { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 },
+    freeTrialUsed: false,
     createdAt: now, updatedAt: now,
   };
   if (db) {
@@ -1712,7 +1720,7 @@ app.post("/auth/verify-otp", async (req, res) => {
   }
   const token = uuid();
   sessions.set(token, { token, username: user.username, role: user.role || "user", id: user.id, expiresAt: Date.now() + SESSION_TIMEOUT_SECONDS * 1000 });
-  res.json({ token, username: user.username, role: user.role || "user", status: user.status, credits: user.credits || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {} });
+  res.json({ token, username: user.username, role: user.role || "user", status: user.status, credits: user.credits || 0, costPerEmail: user.costPerEmail || DEFAULT_COST_PER_EMAIL, features: user.features || {}, freeTrialUsed: user.freeTrialUsed !== false });
 });
 
 app.post("/auth/resend-otp", async (req, res) => {
@@ -1846,6 +1854,7 @@ app.post("/admin/users", requireAuth, requireAdmin, async (req, res) => {
     creditsUsed: 0,
     costPerEmail: costPerEmail !== undefined ? parseInt(costPerEmail, 10) : DEFAULT_COST_PER_EMAIL,
     features: features || { attachments: true, richEditor: true, batchSending: true, maxRecipientsPerJob: 500 },
+    freeTrialUsed: true,
     createdAt: now,
     updatedAt: now,
   };

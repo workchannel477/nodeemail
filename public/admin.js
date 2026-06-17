@@ -723,6 +723,7 @@ const dashboardAppDefinition = () => ({
     userCredits: 0,
     creditsPerEmail: 1,
     showTopUp: false,
+    showFreeTrialPopup: false,
     topUpSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10 },
     log(level) {
       if (typeof console[level] === 'function') console[level].apply(console, Array.from(arguments).slice(1));
@@ -1164,6 +1165,7 @@ const dashboardAppDefinition = () => ({
         this.userCredits = data.credits || 0;
         this.creditsPerEmail = data.costPerEmail || 1;
         localStorage.setItem('mailer_user', JSON.stringify(data));
+        if (data.freeTrialUsed === false) this.showFreeTrialPopup = true;
       } catch (error) { this.error = error.message; }
     },
 
