@@ -317,13 +317,13 @@
 
       <template x-if="!token">
         <div class="flex items-center justify-center min-h-screen p-4">
-          <section class="surface p-8 w-full max-w-md reveal">
+          <section class="p-8 w-full max-w-md reveal">
             <div class="text-center mb-6">
               <div class="w-14 h-14 rounded-xl bg-teal-100 flex items-center justify-center mx-auto">
                 <i class="ti ti-mail-forward text-2xl text-teal-600"></i>
               </div>
               <h1 class="mt-3 text-2xl font-bold text-[var(--ink)]">Delivery Workspace</h1>
-              <p class="mt-1 text-sm text-[var(--muted)]" x-text="authMode === 'login' ? 'Sign in to your account' : authMode === 'signup' ? 'Create a new account' : 'Verify your email'"></p>
+              <p class="mt-1 text-sm text-[var(--muted)]" x-text="authMode === 'login' ? 'Sign in to your account' : authMode === 'signup' ? 'Create a new account' : authMode === 'forgot' ? 'Reset your password' : authMode === 'reset' ? 'Set a new password' : 'Verify your email'"></p>
             </div>
 
             <!-- Login Form -->
@@ -345,7 +345,10 @@
                 </button>
                 <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
               </form>
-              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+              <p class="mt-3 text-xs text-center text-[var(--muted)]">
+                <a href="#" @click.prevent="authMode = 'forgot'; error = ''" class="text-teal-600 font-medium">Forgot password?</a>
+              </p>
+              <p class="mt-2 text-sm text-center text-[var(--muted)]">
                 Don't have an account?
                 <a href="#" @click.prevent="authMode = 'signup'; error = ''" class="text-teal-600 font-medium">Sign up</a>
               </p>
@@ -398,6 +401,48 @@
               <p class="mt-3 text-xs text-center text-[var(--muted)]">
                 Didn't receive the code?
                 <a href="#" @click.prevent="resendOtp" class="text-teal-600 font-medium">Resend</a>
+              </p>
+            </section>
+
+            <!-- Forgot Password -->
+            <section x-show="authMode === 'forgot'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Forgot Password</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Enter your username to receive a reset link.</p>
+              <form class="mt-5 space-y-4" @submit.prevent="forgotPassword">
+                <div>
+                  <label class="text-sm font-medium">Username</label>
+                  <input type="text" x-model.trim="forgotForm.username" class="field mt-1" required />
+                </div>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-mail mr-1"></i> Send Reset Link</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Sending...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+                <p class="text-sm text-teal-600" x-show="message && !error" x-text="message"></p>
+              </form>
+              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+                <a href="#" @click.prevent="authMode = 'login'; error = ''" class="text-teal-600 font-medium">Back to sign in</a>
+              </p>
+            </section>
+
+            <!-- Reset Password -->
+            <section x-show="authMode === 'reset'" class="surface p-6 md:p-8 lg:col-span-5 reveal">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Set New Password</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Enter your new password.</p>
+              <form class="mt-5 space-y-4" @submit.prevent="resetPassword">
+                <div>
+                  <label class="text-sm font-medium">New Password</label>
+                  <input type="password" x-model.trim="resetForm.newPassword" class="field mt-1" required minlength="4" />
+                </div>
+                <button type="submit" class="btn-primary w-full py-2.5 font-semibold" :disabled="busy">
+                  <span x-show="!busy"><i class="ti ti-lock mr-1"></i> Reset Password</span>
+                  <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Resetting...</span>
+                </button>
+                <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+                <p class="text-sm text-teal-600" x-show="message && !error" x-text="message"></p>
+              </form>
+              <p class="mt-4 text-sm text-center text-[var(--muted)]">
+                <a href="#" @click.prevent="authMode = 'login'; error = ''" class="text-teal-600 font-medium">Back to sign in</a>
               </p>
             </section>
         </div>
@@ -754,6 +799,34 @@
                 </div>
                 </template>
               </article>
+            </section>
+
+            <!-- Section: Settings -->
+            <section x-show="currentSection === 'settings'" class="surface p-5 md:p-6">
+              <h2 class="text-xl font-bold text-[var(--ink)]">Settings</h2>
+              <p class="text-sm text-[var(--muted)] mt-1">Change your account password.</p>
+              <div class="mt-6 max-w-md">
+                <form class="space-y-4" @submit.prevent="changePassword">
+                  <div>
+                    <label class="text-sm font-medium">Current Password</label>
+                    <input type="password" x-model.trim="changePasswordForm.currentPassword" class="field mt-1" required />
+                  </div>
+                  <div>
+                    <label class="text-sm font-medium">New Password</label>
+                    <input type="password" x-model.trim="changePasswordForm.newPassword" class="field mt-1" required minlength="4" />
+                  </div>
+                  <div>
+                    <label class="text-sm font-medium">Confirm New Password</label>
+                    <input type="password" x-model.trim="changePasswordForm.confirmPassword" class="field mt-1" required minlength="4" />
+                  </div>
+                  <button type="submit" class="btn-primary py-2.5 px-5 font-semibold" :disabled="busy">
+                    <span x-show="!busy"><i class="ti ti-device-floppy mr-1"></i> Update Password</span>
+                    <span x-show="busy"><i class="ti ti-loader animate-spin mr-1"></i> Updating...</span>
+                  </button>
+                  <p class="text-sm text-rose-600" x-show="error" x-text="error"></p>
+                  <p class="text-sm text-teal-600" x-show="message && !error" x-text="message"></p>
+                </form>
+              </div>
             </section>
 
           </div>

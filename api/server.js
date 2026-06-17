@@ -1726,6 +1726,96 @@ app.post("/auth/resend-otp", async (req, res) => {
   res.json({ message: "OTP resent", otp });
 });
 
+// ---------- Password Reset ----------
+
+const resetTokens = new Map();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of resetTokens) {
+    if (val.expiresAt < now) resetTokens.delete(key);
+  }
+}, 300000);
+
+app.post("/auth/forgot-password", async (req, res) => {
+  const { username = "" } = req.body || {};
+  if (!username) return res.status(400).json({ message: "Username is required" });
+  const user = await findUserByUsername(username.toLowerCase().trim());
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const token = uuid();
+  resetTokens.set(token, { username: user.username, expiresAt: Date.now() + 3600000 });
+  console.log(`Password reset token for ${user.username}: ${token}`);
+  try {
+    const smtpServers = await loadSmtpPool();
+    if (smtpServers.servers?.length) {
+      const srv = smtpServers.servers[0];
+      const transporter = nodemailer.createTransport({
+        host: srv.host, port: parseInt(srv.port || "587", 10),
+        secure: parseInt(srv.port || "587", 10) === 465,
+        auth: { user: srv.username, pass: srv.password },
+      });
+      const resetLink = `${req.protocol}://${req.get("host")}/dashboard#reset?token=${token}`;
+      await transporter.sendMail({
+        from: srv.from || srv.username,
+        to: user.email || user.username,
+        subject: "Password reset request",
+        html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p><p>Token: ${token}</p>`,
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to send reset email:", err.message);
+  }
+  res.json({ message: "If the account exists, a reset link has been sent.", token });
+});
+
+app.post("/auth/reset-password", async (req, res) => {
+  const { token = "", newPassword = "" } = req.body || {};
+  if (!token || !newPassword) return res.status(400).json({ message: "Token and new password are required" });
+  if (newPassword.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters" });
+  const record = resetTokens.get(token);
+  if (!record) return res.status(400).json({ message: "Invalid or expired token" });
+  if (Date.now() > record.expiresAt) { resetTokens.delete(token); return res.status(400).json({ message: "Token expired" }); }
+  const user = await findUserByUsername(record.username);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const salt = cryptoSalt();
+  user.passwordHash = hashPassword(newPassword, salt);
+  user.salt = salt;
+  user.updatedAt = new Date().toISOString();
+  if (db) {
+    await db.collection("users").doc(user.id).set(user);
+  } else {
+    const store = await readJsonFallback(authFilePath, { users: [] });
+    const idx = store.users.findIndex((u) => u.username === user.username);
+    if (idx !== -1) store.users[idx] = user;
+    await writeJsonFallback(authFilePath, store);
+  }
+  resetTokens.delete(token);
+  res.json({ message: "Password reset successfully. You can now sign in." });
+});
+
+app.post("/auth/change-password", requireAuth, async (req, res) => {
+  const { currentPassword = "", newPassword = "" } = req.body || {};
+  if (!currentPassword || !newPassword) return res.status(400).json({ message: "Current and new password are required" });
+  if (newPassword.length < 4) return res.status(400).json({ message: "New password must be at least 4 characters" });
+  const user = await findUserByUsername(req.user.username);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const expected = hashPassword(currentPassword, user.salt);
+  if (expected !== user.passwordHash) return res.status(401).json({ message: "Current password is incorrect" });
+  const salt = cryptoSalt();
+  user.passwordHash = hashPassword(newPassword, salt);
+  user.salt = salt;
+  user.updatedAt = new Date().toISOString();
+  if (db) {
+    await db.collection("users").doc(user.id).set(user);
+  } else {
+    const store = await readJsonFallback(authFilePath, { users: [] });
+    const idx = store.users.findIndex((u) => u.username === user.username);
+    if (idx !== -1) store.users[idx] = user;
+    await writeJsonFallback(authFilePath, store);
+  }
+  res.json({ message: "Password changed successfully." });
+});
+
 // ---------- Admin: Users ----------
 
 app.get("/admin/users", requireAuth, requireAdmin, async (_req, res) => {

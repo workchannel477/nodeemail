@@ -43,6 +43,7 @@ const adminAppDefinition = () => ({
     error: '',
     message: '',
     isReady: false,
+    dataLoading: false,
     showAddUserModal: false,
     isChangePasswordModalOpen: false,
     showEditUserModal: false,
@@ -118,6 +119,7 @@ const adminAppDefinition = () => ({
           }
         });
 
+        this.dataLoading = true;
         await this.fetchOverview();
         await this.loadIPRotation();
         await this.loadRateLimits();
@@ -127,6 +129,7 @@ const adminAppDefinition = () => ({
         await this.loadPaymentSettings();
         await this.loadTelegramBot();
         this.$nextTick(() => this.initPaymentQuill());
+        this.dataLoading = false;
       }
     },
 
@@ -659,9 +662,13 @@ const dashboardAppDefinition = () => ({
     statusFilter: 'all',
     authMode: 'login',
     loginForm: { username: '', password: '' },
+    forgotForm: { username: '' },
+    resetForm: { token: '', newPassword: '' },
     signupForm: { username: '', email: '', password: '' },
     otpForm: { code: '' },
     signupUsername: '',
+    changePasswordForm: { currentPassword: '', newPassword: '', confirmPassword: '' },
+    showChangePassword: false,
     form: { fromName: '', replyTo: '', subject: '', recipients: '', htmlBody: '', textBody: '', cc: '', bcc: '' },
     attachments: [],
     uploadingFile: false,
@@ -678,6 +685,7 @@ const dashboardAppDefinition = () => ({
       { id: 'dashboard', label: 'Dashboard', icon: 'ti-dashboard' },
       { id: 'compose', label: 'Compose', icon: 'ti-send' },
       { id: 'jobs', label: 'Jobs', icon: 'ti-mail' },
+      { id: 'settings', label: 'Settings', icon: 'ti-settings' },
     ],
 
     get currentSectionLabel() {
@@ -1034,6 +1042,47 @@ const dashboardAppDefinition = () => ({
       try {
         const response = await apiFetch('/auth/resend-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: this.signupUsername }) });
         if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Failed to resend OTP'); }
+      } catch (error) { this.error = error.message; } finally { this.busy = false; }
+    },
+
+    async forgotPassword() {
+      this.error = '';
+      this.busy = true;
+      try {
+        const response = await apiFetch('/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.forgotForm) });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Failed'); }
+        this.message = 'If the account exists, a reset link has been sent.';
+        setTimeout(() => this.message = '', 5000);
+        this.authMode = 'login';
+      } catch (error) { this.error = error.message; } finally { this.busy = false; }
+    },
+
+    async resetPassword() {
+      this.error = '';
+      this.busy = true;
+      try {
+        const response = await apiFetch('/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.resetForm) });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Reset failed'); }
+        this.message = 'Password reset successfully. Sign in with your new password.';
+        setTimeout(() => this.message = '', 5000);
+        this.authMode = 'login';
+      } catch (error) { this.error = error.message; } finally { this.busy = false; }
+    },
+
+    async changePassword() {
+      this.error = '';
+      if (this.changePasswordForm.newPassword !== this.changePasswordForm.confirmPassword) {
+        this.error = 'Passwords do not match.';
+        return;
+      }
+      this.busy = true;
+      try {
+        const response = await apiFetch('/auth/change-password', { method: 'POST', headers: this.headers(), body: JSON.stringify({ currentPassword: this.changePasswordForm.currentPassword, newPassword: this.changePasswordForm.newPassword }) });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Failed to change password'); }
+        this.message = 'Password changed successfully.';
+        setTimeout(() => this.message = '', 4000);
+        this.showChangePassword = false;
+        this.changePasswordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
       } catch (error) { this.error = error.message; } finally { this.busy = false; }
     },
 
