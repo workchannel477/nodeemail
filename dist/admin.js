@@ -635,8 +635,8 @@ const adminAppDefinition = () => ({
       return parts.join(' · ');
     },
 
-    redirectHome() { window.location.href = '/'; },
-    openUserPanel() { window.location.href = '/'; },
+    redirectHome() { window.location.href = '/dashboard'; },
+    openUserPanel() { window.location.href = '/dashboard'; },
   });
 
 // User App
