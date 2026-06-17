@@ -149,16 +149,14 @@
           <div class="max-w-6xl mx-auto">
 
             <!-- Full-screen loader while data loads -->
-            <template x-if="dataLoading">
-              <div class="flex items-center justify-center py-32">
-                <div class="text-center">
-                  <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
-                  <p class="mt-4 text-gray-500">Loading admin data...</p>
-                </div>
+            <div x-show="dataLoading" class="flex items-center justify-center py-32">
+              <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
+                <p class="mt-4 text-gray-500">Loading admin data...</p>
               </div>
-            </template>
+            </div>
 
-            <template x-if="!dataLoading">
+            <div x-show="!dataLoading">
             <!-- Section: Dashboard -->
             <section x-show="currentSection === 'dashboard'" class="bg-white shadow rounded-xl p-6 card-wrap">
               <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -714,7 +712,7 @@
                 </template>
               </div>
             </section>
-            </template> <!-- !dataLoading -->
+            </div> <!-- !dataLoading -->
 
             <!-- Message / Error -->
             <p class="text-center text-sm text-gray-500 mt-6" x-show="message" x-text="message"></p>
