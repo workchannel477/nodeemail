@@ -566,9 +566,9 @@ async function writeRateLimits(data) {
 async function readAppSettings() {
   if (db) {
     const doc = await db.collection("config").doc("appSettings").get();
-    return doc.exists ? doc.data() : { paymentDetails: '', telegramLink: '' };
+    return doc.exists ? doc.data() : { paymentDetails: '', telegramLink: '', tokenRate: 10, ogTitle: '', ogDescription: '', ogImage: '' };
   }
-  return readJsonFallback(appSettingsPath, { paymentDetails: '', telegramLink: '' });
+  return readJsonFallback(appSettingsPath, { paymentDetails: '', telegramLink: '', tokenRate: 10, ogTitle: '', ogDescription: '', ogImage: '' });
 }
 
 async function saveAppSettings(data) {
@@ -2048,11 +2048,14 @@ app.get("/admin/settings", requireAuth, requireAdmin, async (_req, res) => {
 });
 
 app.post("/admin/settings", requireAuth, requireAdmin, async (req, res) => {
-  const { paymentDetails, telegramLink, tokenRate } = req.body || {};
+  const { paymentDetails, telegramLink, tokenRate, ogTitle, ogDescription, ogImage } = req.body || {};
   const settings = await readAppSettings();
   if (paymentDetails !== undefined) settings.paymentDetails = String(paymentDetails);
   if (telegramLink !== undefined) settings.telegramLink = String(telegramLink);
   if (tokenRate !== undefined) settings.tokenRate = Number(tokenRate) || 10;
+  if (ogTitle !== undefined) settings.ogTitle = String(ogTitle);
+  if (ogDescription !== undefined) settings.ogDescription = String(ogDescription);
+  if (ogImage !== undefined) settings.ogImage = String(ogImage);
   settings.updatedAt = new Date().toISOString();
   await saveAppSettings(settings);
   res.json({ message: "Settings saved", settings });
@@ -2620,6 +2623,9 @@ app.get("/api/settings", requireAuth, async (_req, res) => {
     paymentDetails: settings.paymentDetails || '',
     telegramLink: settings.telegramLink || '',
     tokenRate: settings.tokenRate || 10,
+    ogTitle: settings.ogTitle || '',
+    ogDescription: settings.ogDescription || '',
+    ogImage: settings.ogImage || '',
   });
 });
 
@@ -2667,11 +2673,43 @@ app.get("/healthz", async (_req, res) => {
   }
 });
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, function (m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    if (m === '"') return '&quot;';
+    if (m === "'") return '&#39;';
+    return m;
+  });
+}
+
 // ---------- Static / Clean URLs ----------
 app.use(express.static(staticDir));
 app.get('/', (_req, res) => res.redirect('/dashboard'));
 app.get('/admin', (_req, res) => res.sendFile(path.join(staticDir, 'admin.html')));
-app.get('/dashboard', (_req, res) => res.sendFile(path.join(staticDir, 'index.html')));
+app.get('/dashboard', async (_req, res) => {
+  try {
+    const settings = await readAppSettings();
+    const ogTitle = settings.ogTitle || 'Email Workspace';
+    const ogDescription = settings.ogDescription || 'Send and manage email campaigns with ease.';
+    const ogImage = settings.ogImage || '';
+    const ogTags = [
+      '<meta property="og:title" content="' + escapeHtml(ogTitle) + '" />',
+      '<meta property="og:description" content="' + escapeHtml(ogDescription) + '" />',
+      '<meta name="twitter:card" content="summary_large_image" />',
+    ];
+    if (ogImage) {
+      ogTags.push('<meta property="og:image" content="' + escapeHtml(ogImage) + '" />');
+      ogTags.push('<meta name="twitter:image" content="' + escapeHtml(ogImage) + '" />');
+    }
+    let html = await fs.readFile(path.join(staticDir, 'index.html'), 'utf8');
+    html = html.replace('</head>', ogTags.join('\n    ') + '\n  </head>');
+    res.send(html);
+  } catch {
+    res.sendFile(path.join(staticDir, 'index.html'));
+  }
+});
 
 app.listen(PORT, async () => {
   console.log(`API running on http://localhost:${PORT} (serving static from ${staticDir})`);

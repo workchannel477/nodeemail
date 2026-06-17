@@ -70,7 +70,7 @@ const adminAppDefinition = () => ({
     activeTab: 'all',
     syncBusy: false,
     syncLog: [],
-    paymentSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10 },
+    paymentSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10, ogTitle: '', ogDescription: '', ogImage: '' },
     paymentSettingsBusy: false,
     paymentQuill: null,
     currentSection: 'dashboard',
@@ -95,6 +95,7 @@ const adminAppDefinition = () => ({
       { id: 'jobs', label: 'Jobs', icon: 'ti-mail' },
       { id: 'datasync', label: 'Data Sync', icon: 'ti-database' },
       { id: 'payment', label: 'Payment', icon: 'ti-credit-card' },
+      { id: 'seo', label: 'SEO', icon: 'ti-share' },
       { id: 'telegram', label: 'Telegram', icon: 'ti-brand-telegram' },
       { id: 'logs', label: 'Logs', icon: 'ti-list' },
     ],
@@ -457,6 +458,9 @@ const adminAppDefinition = () => ({
             paymentDetails: data.paymentDetails || '',
             telegramLink: data.telegramLink || '',
             tokenRate: data.tokenRate || 10,
+            ogTitle: data.ogTitle || '',
+            ogDescription: data.ogDescription || '',
+            ogImage: data.ogImage || '',
           };
           this.$nextTick(() => {
             if (this.paymentQuill && this.paymentSettings.paymentDetails) {
