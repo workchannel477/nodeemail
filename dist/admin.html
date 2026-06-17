@@ -679,6 +679,41 @@
                 <p class="text-sm mt-1">Enter a bot token above and click Start.</p>
               </div>
             </section>
+
+            <!-- Section: Logs -->
+            <section x-show="currentSection === 'logs'" class="bg-white shadow rounded-xl p-6 card-wrap">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                  <i class="ti ti-list text-2xl text-teal-500"></i>
+                  <div>
+                    <h2 class="text-xl font-semibold text-gray-800">Application Logs</h2>
+                    <p class="text-sm text-gray-500">Front-end warnings and errors captured from user sessions.</p>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button @click="loadLogs" class="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100 text-sm">
+                    <i class="ti ti-refresh"></i> Refresh
+                  </button>
+                  <button @click="clearLogs" class="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 text-sm">
+                    <i class="ti ti-trash"></i> Clear
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <template x-if="!appLogs.length">
+                  <p class="text-center py-12 text-gray-400 text-sm">No logs captured yet.</p>
+                </template>
+                <template x-for="entry in appLogs" :key="entry.id">
+                  <div class="flex items-start gap-3 p-3 rounded-lg text-sm border-l-4" :class="{'border-l-rose-400 bg-rose-50': entry.level === 'error', 'border-l-amber-400 bg-amber-50': entry.level === 'warn', 'border-l-teal-400 bg-gray-50': entry.level === 'info'}">
+                    <span class="text-xs font-mono text-gray-400 shrink-0 w-16" x-text="new Date(entry.timestamp).toLocaleTimeString()"></span>
+                    <span class="text-xs font-semibold uppercase shrink-0 w-12" :class="{'text-rose-600': entry.level === 'error', 'text-amber-600': entry.level === 'warn', 'text-teal-600': entry.level === 'info'}" x-text="entry.level"></span>
+                    <span class="text-xs text-gray-400 shrink-0 w-24 truncate" x-text="entry.username"></span>
+                    <span class="flex-1 text-gray-700 break-words" x-text="entry.message"></span>
+                    <span class="text-xs text-gray-400 shrink-0" x-text="entry.section || ''"></span>
+                  </div>
+                </template>
+              </div>
+            </section>
             </template> <!-- !dataLoading -->
 
             <!-- Message / Error -->

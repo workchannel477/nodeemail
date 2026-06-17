@@ -16,6 +16,13 @@ const readApiMessage = async (response, fallback = 'Request failed') => {
     try { const text = await response.text(); return text || fallback; } catch (innerError) { return fallback; }
   }
 };
+function logToBackend(level) {
+  const msg = Array.from(arguments).slice(1).map(a => typeof a === 'object' ? (a.message || JSON.stringify(a)) : String(a)).join(' ');
+  const token = localStorage.getItem('mailer_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  fetch(apiUrl('/api/logs'), { method: 'POST', headers, body: JSON.stringify({ level, message: msg }) }).catch(() => {});
+}
 
 // Admin App
 const adminAppDefinition = () => ({
@@ -44,6 +51,14 @@ const adminAppDefinition = () => ({
     message: '',
     isReady: false,
     dataLoading: false,
+    appLogs: [],
+    log(level) {
+      if (typeof console[level] === 'function') console[level].apply(console, Array.from(arguments).slice(1));
+      const msg = Array.from(arguments).slice(1).map(a => typeof a === 'object' ? (a && a.message ? a.message : JSON.stringify(a)) : String(a)).join(' ');
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.token) headers.Authorization = `Bearer ${this.token}`;
+      fetch(apiUrl('/api/logs'), { method: 'POST', headers, body: JSON.stringify({ level, message: msg, section: this.currentSection }) }).catch(() => {});
+    },
     showAddUserModal: false,
     isChangePasswordModalOpen: false,
     showEditUserModal: false,
@@ -80,6 +95,7 @@ const adminAppDefinition = () => ({
       { id: 'datasync', label: 'Data Sync', icon: 'ti-database' },
       { id: 'payment', label: 'Payment', icon: 'ti-credit-card' },
       { id: 'telegram', label: 'Telegram', icon: 'ti-brand-telegram' },
+      { id: 'logs', label: 'Logs', icon: 'ti-list' },
     ],
 
     get currentSectionLabel() {
@@ -167,7 +183,7 @@ const adminAppDefinition = () => ({
     },
 
     async logout() {
-      try { await apiFetch('/auth/logout', { method: 'POST', headers: this.headers() }); } catch (error) { console.warn(error); }
+      try { await apiFetch('/auth/logout', { method: 'POST', headers: this.headers() }); } catch (error) { this.log('warn', error); }
       this.token = '';
       this.user = null;
       this.overview = { users: [], jobs: [], ipRotation: { proxies: [], currentIndex: 0 }, rateLimits: { limits: {} }, stats: {} };
@@ -195,19 +211,19 @@ const adminAppDefinition = () => ({
       try {
         const response = await apiFetch('/admin/ip-rotation', { headers: this.headers() });
         if (response.ok) { const data = await response.json(); this.ipRotation = data; this.ipForm.proxies = (data.proxies || []).join('\n') || ''; }
-      } catch (error) { console.error('Failed to load IP rotation:', error); }
+      } catch (error) { this.log('error', 'Failed to load IP rotation:', error); }
     },
 
     async loadRateLimits() {
-      try { const response = await apiFetch('/admin/rate-limits', { headers: this.headers() }); if (response.ok) { this.rateLimits = await response.json(); } } catch (error) { console.error(error); }
+      try { const response = await apiFetch('/admin/rate-limits', { headers: this.headers() }); if (response.ok) { this.rateLimits = await response.json(); } } catch (error) { this.log('error', error); }
     },
 
     async loadSmtpPool() {
-      try { const response = await apiFetch('/admin/smtp', { headers: this.headers() }); if (response.ok) { this.smtpPool = await response.json(); } } catch (error) { console.error(error); }
+      try { const response = await apiFetch('/admin/smtp', { headers: this.headers() }); if (response.ok) { this.smtpPool = await response.json(); } } catch (error) { this.log('error', error); }
     },
 
     async loadCreditData() {
-      try { const response = await apiFetch('/admin/credits', { headers: this.headers() }); if (response.ok) { this.creditData = await response.json(); } } catch (error) { console.error('Failed to load credits:', error); }
+      try { const response = await apiFetch('/admin/credits', { headers: this.headers() }); if (response.ok) { this.creditData = await response.json(); } } catch (error) { this.log('error', 'Failed to load credits:', error); }
     },
 
     providerConfigTemplate(type) {
@@ -233,7 +249,7 @@ const adminAppDefinition = () => ({
     handleProviderTypeChange() { this.providerForm.config = this.providerConfigTemplate(this.providerForm.type); },
 
     async loadMailProviders() {
-      try { const response = await apiFetch('/admin/providers', { headers: this.headers() }); if (response.ok) { this.mailProviders = await response.json(); } } catch (error) { console.error(error); }
+      try { const response = await apiFetch('/admin/providers', { headers: this.headers() }); if (response.ok) { this.mailProviders = await response.json(); } } catch (error) { this.log('error', error); }
     },
 
     openProviderForm(provider = null) { if (provider) { this.resetProviderForm(provider); this.editingProviderId = provider.id; } else { this.resetProviderForm(); this.editingProviderId = null; } this.providerFormVisible = true; },
@@ -446,7 +462,7 @@ const adminAppDefinition = () => ({
             }
           });
         }
-      } catch (error) { console.error('Failed to load payment settings:', error); }
+      } catch (error) { this.log('error', 'Failed to load payment settings:', error); }
     },
 
     initPaymentQuill() {
@@ -466,7 +482,7 @@ const adminAppDefinition = () => ({
         if (this.paymentSettings.paymentDetails) {
           this.paymentQuill.root.innerHTML = this.paymentSettings.paymentDetails;
         }
-      } catch (e) { console.warn('Payment Quill init failed:', e); }
+      } catch (e) { this.log('warn', 'Payment Quill init failed:', e); }
     },
 
     async savePaymentSettings() {
@@ -638,6 +654,21 @@ const adminAppDefinition = () => ({
       return parts.join(' · ');
     },
 
+    async loadLogs() {
+      try {
+        const response = await apiFetch('/api/logs', { headers: this.headers() });
+        if (response.ok) this.appLogs = await response.json();
+      } catch (err) { this.log('error', 'Failed to load logs:', err); }
+    },
+
+    async clearLogs() {
+      if (!confirm('Clear all logs?')) return;
+      try {
+        const response = await apiFetch('/api/logs', { method: 'DELETE', headers: this.headers() });
+        if (response.ok) { this.appLogs = []; this.message = 'Logs cleared'; setTimeout(() => this.message = '', 3000); }
+      } catch (err) { this.log('error', 'Failed to clear logs:', err); }
+    },
+
     redirectHome() { window.location.href = '/dashboard'; },
     openUserPanel() { window.location.href = '/dashboard'; },
   });
@@ -679,6 +710,13 @@ const dashboardAppDefinition = () => ({
     creditsPerEmail: 1,
     showTopUp: false,
     topUpSettings: { paymentDetails: '', telegramLink: '', tokenRate: 10 },
+    log(level) {
+      if (typeof console[level] === 'function') console[level].apply(console, Array.from(arguments).slice(1));
+      const msg = Array.from(arguments).slice(1).map(a => typeof a === 'object' ? (a && a.message ? a.message : JSON.stringify(a)) : String(a)).join(' ');
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.token) headers.Authorization = `Bearer ${this.token}`;
+      fetch(apiUrl('/api/logs'), { method: 'POST', headers, body: JSON.stringify({ level, message: msg, section: this.currentSection }) }).catch(() => {});
+    },
     currentSection: 'dashboard',
     mobileNavOpen: false,
     navItems: [
@@ -868,7 +906,7 @@ const dashboardAppDefinition = () => ({
           this.quill.root.innerHTML = this.form.htmlBody;
         }
       } catch (e) {
-        console.warn('Quill init failed:', e);
+        this.log('warn', 'Quill init failed:', e);
       }
     },
 
@@ -1087,7 +1125,7 @@ const dashboardAppDefinition = () => ({
     },
 
     async logout() {
-      if (this.token) { try { await apiFetch('/auth/logout', { method: 'POST', headers: this.headers() }); } catch (error) { console.warn(error); } }
+      if (this.token) { try { await apiFetch('/auth/logout', { method: 'POST', headers: this.headers() }); } catch (error) { this.log('warn', error); } }
       localStorage.removeItem('mailer_token');
       localStorage.removeItem('mailer_user');
       if (this.user && this.user.username) { localStorage.removeItem(`mailer_job_draft_${this.user.username}`); localStorage.removeItem(`mailer_attachments_${this.user.username}`); }
@@ -1127,7 +1165,7 @@ const dashboardAppDefinition = () => ({
             tokenRate: data.tokenRate || 10,
           };
         }
-      } catch (error) { console.error('Failed to load top-up settings:', error); }
+      } catch (error) { this.log('error', 'Failed to load top-up settings:', error); }
     },
 
     async fetchJobs() {

@@ -120,6 +120,7 @@ const smtpPoolFilePath = path.join(dataDir, "smtp-pool.json");
 const mailProvidersFilePath = path.join(dataDir, "mail-providers.json");
 const activityLogPath = path.join(dataDir, "activity-log.json");
 const appSettingsPath = path.join(dataDir, "app-settings.json");
+const logsFilePath = path.join(dataDir, "logs.json");
 const telegramDataPath = path.join(dataDir, "telegram.json");
 
 const recipientsDir = path.join(dataDir, "job-recipients");
@@ -2620,6 +2621,41 @@ app.get("/api/settings", requireAuth, async (_req, res) => {
     telegramLink: settings.telegramLink || '',
     tokenRate: settings.tokenRate || 10,
   });
+});
+
+const MAX_LOG_ENTRIES = 1000;
+
+async function loadLogs() {
+  try { return await readJsonFallback(logsFilePath, { entries: [] }); }
+  catch { return { entries: [] }; }
+}
+
+async function saveLogs(data) {
+  if (data.entries.length > MAX_LOG_ENTRIES) data.entries = data.entries.slice(-MAX_LOG_ENTRIES);
+  await writeJsonFallback(logsFilePath, data);
+}
+
+app.post("/api/logs", async (req, res) => {
+  try {
+    const { level = "info", message = "", section = "" } = req.body || {};
+    const username = req.user?.username || "anonymous";
+    const data = await loadLogs();
+    data.entries.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), timestamp: new Date().toISOString(), level, message, username, section });
+    await saveLogs(data);
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: true });
+  }
+});
+
+app.get("/api/logs", requireAuth, requireAdmin, async (_req, res) => {
+  const data = await loadLogs();
+  res.json(data.entries.reverse());
+});
+
+app.delete("/api/logs", requireAuth, requireAdmin, async (_req, res) => {
+  await saveLogs({ entries: [] });
+  res.json({ message: "Logs cleared" });
 });
 
 // ---------- Health ----------
