@@ -100,6 +100,24 @@ const adminAppDefinition = () => ({
           return;
         }
 
+        const hash = location.hash.replace('#', '');
+        if (hash) {
+          const match = this.navItems.find(i => i.id === hash);
+          if (match) this.currentSection = hash;
+        }
+        this.$watch('currentSection', (val) => {
+          if (val && location.hash.replace('#', '') !== val) {
+            history.replaceState(null, '', '#' + val);
+          }
+        });
+        window.addEventListener('hashchange', () => {
+          const h = location.hash.replace('#', '');
+          if (h && this.currentSection !== h) {
+            const match = this.navItems.find(i => i.id === h);
+            if (match) this.currentSection = h;
+          }
+        });
+
         await this.fetchOverview();
         await this.loadIPRotation();
         await this.loadRateLimits();
@@ -617,8 +635,8 @@ const adminAppDefinition = () => ({
       return parts.join(' · ');
     },
 
-    redirectHome() { window.location.href = '/index.html'; },
-    openUserPanel() { window.location.href = '/index.html'; },
+    redirectHome() { window.location.href = '/'; },
+    openUserPanel() { window.location.href = '/'; },
   });
 
 // User App
@@ -710,6 +728,24 @@ const dashboardAppDefinition = () => ({
 
     async init() {
       if (this.token) {
+        const hash = location.hash.replace('#', '');
+        if (hash) {
+          const match = this.navItems.find(i => i.id === hash);
+          if (match) this.currentSection = hash;
+        }
+        this.$watch('currentSection', (val) => {
+          if (val && location.hash.replace('#', '') !== val) {
+            history.replaceState(null, '', '#' + val);
+          }
+        });
+        window.addEventListener('hashchange', () => {
+          const h = location.hash.replace('#', '');
+          if (h && this.currentSection !== h) {
+            const match = this.navItems.find(i => i.id === h);
+            if (match) this.currentSection = h;
+          }
+        });
+
         await this.fetchJobs();
         await this.refreshProfile();
         this.loadDraft();
@@ -1172,7 +1208,7 @@ const dashboardAppDefinition = () => ({
       return parts.join(' · ');
     },
 
-    openAdmin() { window.location.href = '/admin.html'; },
+    openAdmin() { window.location.href = '/admin'; },
 
     copyToClipboard(text, event) {
       if (!text) return;

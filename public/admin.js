@@ -1208,7 +1208,7 @@ const dashboardAppDefinition = () => ({
       return parts.join(' · ');
     },
 
-    openAdmin() { window.location.href = '/admin.html'; },
+    openAdmin() { window.location.href = '/admin'; },
 
     copyToClipboard(text, event) {
       if (!text) return;

@@ -2541,8 +2541,9 @@ app.get("/healthz", async (_req, res) => {
   }
 });
 
-// ---------- Static ----------
+// ---------- Static / Clean URLs ----------
 app.use(express.static(staticDir));
+app.get('/admin', (_req, res) => res.sendFile(path.join(staticDir, 'admin.html')));
 
 app.listen(PORT, async () => {
   console.log(`API running on http://localhost:${PORT} (serving static from ${staticDir})`);
